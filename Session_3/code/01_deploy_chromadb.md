@@ -45,7 +45,7 @@ docker run -d \
   -v /local/path/to/data:/chroma/chroma \
   -e IS_PERSISTENT=TRUE \
   -e PERSIST_DIRECTORY=/chroma/chroma \
-  chromadb/chroma
+  chromadb/chroma:0.5.13
 ```
 
 - Replace `/local/path/to/data` with the path to a directory on your local machine where you want ChromaDB to store data.
