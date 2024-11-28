@@ -1,13 +1,15 @@
+import logging
+import os
+import traceback
+from contextlib import asynccontextmanager
+
+import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import logging
-from contextlib import asynccontextmanager
-import traceback
-import os
 from src.bot import CustomChatBot
 
-INDEX_DATA = bool(int(os.environ["INDEX_DATA"]))
+#INDEX_DATA = bool(int(os.environ["INDEX_DATA"]))
+INDEX_DATA = False
 
 # Set up logger
 logger = logging.getLogger("uvicorn")
