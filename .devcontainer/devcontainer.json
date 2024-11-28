@@ -9,6 +9,10 @@
 		"ghcr.io/schlich/devcontainer-features/rye:1": {}
 	},
 
+	"runArgs":[
+		"--network=host"
+		],
+
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 
