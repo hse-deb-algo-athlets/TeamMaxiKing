@@ -9,11 +9,13 @@ from chromadb.config import DEFAULT_DATABASE, DEFAULT_TENANT, Settings
 from langchain.memory import ConversationBufferMemory
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.documents.base import Document
 from langchain_core.load.serializable import Serializable
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableSerializable
+from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -56,7 +58,7 @@ class CustomChatBot:
 
         # Initialize the large language model (LLM) from Ollama
         # TODO: ADD HERE YOUR CODE
-        self.llm = ChatOllama(model="llama3.2")
+        self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
 
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
@@ -70,7 +72,7 @@ class CustomChatBot:
         """
         logger.info("Initialize chroma db client.")
         client = chromadb.HttpClient(
-            host="localhost",
+            host="chroma",
             port=8000,
             ssl=False,
             headers=None,
@@ -102,7 +104,6 @@ class CustomChatBot:
         return vector_db_from_client
     
     def _index_data_to_vector_db(self):
-
         pdf_doc = "src/AI_Book.pdf"
 
         # Create pdf data loader
@@ -127,6 +128,8 @@ class CustomChatBot:
 
         uuids = [str(uuid4()) for _ in range(len(pages_chunked_cleaned[:50]))]
         self.vector_db.add_documents(documents=pages_chunked_cleaned[:50], id=uuids)
+
+        logger.info("AI Book Loaded")
 
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable[Serializable, str]:
@@ -154,6 +157,12 @@ class CustomChatBot:
 
         # ADD HERE YOUR CODE
         rag_prompt = ChatPromptTemplate.from_template(prompt_template)
+        
+        history = InMemoryChatMessageHistory()
+
+
+        def get_history():
+            return history
 
         # ADD HERE YOUR CODE
         retriever = self.vector_db.as_retriever()
@@ -166,7 +175,13 @@ class CustomChatBot:
             | StrOutputParser()
         )
 
-        return qa_rag_chain
+        wrapped_chain = RunnableWithMessageHistory(
+            qa_rag_chain, 
+            get_history,
+            history_messages_key="chat_history"
+        )
+
+        return wrapped_chain
     def _format_docs(self, docs: List[Document]) -> str:
         """
         Helper function to format the retrieved documents into a single string.
@@ -198,3 +213,5 @@ class CustomChatBot:
         except Exception as e:
             logger.error(f"Error in stream_answer: {e}", exc_info=True)
             raise
+        finally:
+            logger.info("Stream complete")

@@ -32,7 +32,7 @@ services:
       - ./backend:/app 
 
   chroma:
-    image: chromadb/chroma
+    image: chromadb/chroma:0.5.13
     volumes:
       - ./chroma:/chroma/.chroma/index
     ports:
