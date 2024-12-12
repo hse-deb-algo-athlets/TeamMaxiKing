@@ -174,14 +174,7 @@ class CustomChatBot:
             | self.llm
             | StrOutputParser()
         )
-
-        wrapped_chain = RunnableWithMessageHistory(
-            qa_rag_chain, 
-            get_history,
-            history_messages_key="chat_history"
-        )
-
-        return wrapped_chain
+        return qa_rag_chain
     def _format_docs(self, docs: List[Document]) -> str:
         """
         Helper function to format the retrieved documents into a single string.
