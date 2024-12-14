@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+Session_5/chatbot_task/backend/pdfs
 # C extensions
 *.so
 

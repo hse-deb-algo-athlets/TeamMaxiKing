@@ -8,6 +8,7 @@ from fastapi import (FastAPI, File, HTTPException, UploadFile, WebSocket,
                      WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from src.bot import CustomChatBot
 
 INDEX_DATA = bool(int(os.environ["INDEX_DATA"]))
@@ -42,20 +43,49 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class CollectionRequest(BaseModel):
+    collection_name: str
+
+
+# Dateiupload
 @app.post("/upload_pdf")
 async def upload_pdf(file: UploadFile = File(...)):    
     upload_dir = "pdfs"
-    os.makedirs(upload_dir, exist_ok=True)
+    try:
+        os.makedirs(upload_dir, exist_ok=True)
 
-    filename = file.filename or "default.pdf"
-    file_path = os.path.join(upload_dir, filename)
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
-    return JSONResponse(content={"message": f"Datei '{filename}' erfolgreich hochgeladen!"})
+        filename = file.filename or "default.pdf"
+        file_path = os.path.join(upload_dir, filename)
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+        
+        app.state.chatbot.set_vector_db_collection(filename)
+        #TODO Aus Datei Fragen generieren
+        
+        
+        return JSONResponse(content={"message": f"Datei '{filename}' erfolgreich hochgeladen!"})
+    
+    except Exception as e:
+         return JSONResponse(status_code=500, content={"message": "Fehler beim Hochladen", "error": str(e)})
+    
+@app.get("/get_collections")
+def get_collections():
+    #TODO Rückgabe aller Collections
+    collections = app.state.chatbot.get_vector_db_collections()
+    
+    return collections
 
+@app.post("/set_collection")
+def set_collection(request: CollectionRequest):
+    # TODO Setzen der Collection die verwendet werden soll (VectorDB neu initialisieren mit neuer collection)
+    collection_name = request.collection_name
+    app.state.chatbot.set_vector_db_collection(collection_name)
+    return {"message": f"Collection {collection_name} ausgewählt"}
 
-
-
+@app.put("/delete_collection")
+def delete_collection(collection_name: str):
+    #TODO Implementieren
+    return ""
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

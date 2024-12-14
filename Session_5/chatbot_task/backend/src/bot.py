@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from typing import List
 from uuid import uuid4
@@ -98,6 +99,50 @@ class CustomChatBot:
         )
 
         return vector_db_from_client
+    
+    #Collection Name anpassen falls ungültige Zeichen enthalten sind
+    def _validate_and_adjust_collection_name(self, name: str) -> str:
+        pdf_name = os.path.splitext(name)[0]
+        adjusted_name = re.sub(r"[^a-zA-Z0-9_-]", "", pdf_name)
+        
+        if adjusted_name and not adjusted_name[0].isalnum():
+            adjusted_name = re.sub(r"^[^a-zA-Z0-9]+", "", adjusted_name)
+        if adjusted_name and not adjusted_name[-1].isalnum():
+            adjusted_name = re.sub(r"[^a-zA-Z0-9]+$", "", adjusted_name)
+        
+        if len(adjusted_name) < 3:
+            adjusted_name = adjusted_name.ljust(3, "x")
+        elif len(adjusted_name) > 63:
+            adjusted_name = adjusted_name[:63]
+        
+        return adjusted_name
+    
+    def set_vector_db_collection(self, collection: str):
+        
+        adjusted_collection_name = self._validate_and_adjust_collection_name(collection)
+        logger.info(f"Setting new collection: {adjusted_collection_name}")
+
+        self.client.get_or_create_collection(adjusted_collection_name)
+
+        vector_db_from_client = Chroma(
+            client=self.client,
+            collection_name=adjusted_collection_name,
+            embedding_function=self.embedding_function
+        )
+
+        self.vector_db = vector_db_from_client
+        
+        #RAG Chain neu initialisieren mit neuer Vector DB
+        self.qa_rag_chain = self._initialize_qa_rag_chain()
+
+    def delete_collection(self, collection: str):
+        #TODO Colletion deleten
+        return ""
+
+    def get_vector_db_collections(self): 
+        collections = self.client.list_collections()
+        collection_names = [collection.name for collection in collections]
+        return collection_names
     
     def _index_data_to_vector_db(self):
         pdf_doc = "src/AI_Book.pdf"

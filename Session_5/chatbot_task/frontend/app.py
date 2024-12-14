@@ -8,12 +8,18 @@ import websockets
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+base_url = "http://backend:5001/"
+
+current_selected_collection = ""
+
 def upload_pdf(path: str):
     if not path:
-        return "Bitte Datei auswählen"
+        gr.Warning(f"Keine Datei ausgewählt")
+        return update_dropdown()
     
     logger.info(f"Dateipfad: {path}")
-    url = "http://backend:5001/upload_pdf"
+    
+    url = base_url + "upload_pdf"
 
     with open(path, "rb") as f:
         logger.info("Datei geladen")
@@ -23,9 +29,52 @@ def upload_pdf(path: str):
     logger.info(response.text)
 
     if response.status_code == 200:
-        return f"Datei wurde übertragen: {response.json()['message']}"
+        gr.Info(response.json()['message'])
+        #TODO Geuploadete Collection auswählen im Dropdown
+        
+        return  update_dropdown()
     else:
-        return f"Fehler bei der Übertragung: {response.status_code}, {response.text}"
+        gr.Warning(response.json()['message'])
+        return update_dropdown()
+    
+def get_collections():
+    """
+    Abfragen der Collections die in der ChromaDB gespeichert sind
+    """
+
+    try:
+        url = base_url + "get_collections"
+        response = requests.get(url)
+        response.raise_for_status()
+
+        collections = response.json()
+        logger.debug(collections)
+        return collections
+    except Exception as e:
+        gr.Warning(f"Fehler beim Collections laden: {e}")
+
+def set_collection(selected_collection: str):
+    """
+    Setzen der Collection die für die RAG Chain verwendet werden soll
+    """
+    try:
+        url = base_url + "set_collection"
+        
+        data = {"collection_name": selected_collection}
+
+        response = requests.post(url, json=data)
+        response.raise_for_status()
+        logger.info(f"Collection {selected_collection} ausgewählt")
+    except:
+        gr.Warning(f"Fehler beim Setzen von {selected_collection}")
+        
+def update_dropdown(selected_collection=None):
+    """
+    Aktualisiere das Dropdown-Menü mit neuen Collections und optional einer vorausgewählten Collection.
+    """
+    new_choices = get_collections()
+    selected_value = selected_collection if selected_collection else (new_choices[0] if new_choices else None)
+    return gr.Dropdown(choices=new_choices, value=selected_value)
 
 # WebSocket chat function (asynchronous generator)
 async def websocket_chat(message: str):
@@ -71,6 +120,9 @@ async def chat(message: str, history=[]):
 
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
+    collections = get_collections()
+    gr.Markdown("### MaxiKing Chatbot")
+    
     with gr.Row():
         with gr.Column(scale=2):
             gr.ChatInterface(
@@ -83,11 +135,16 @@ with gr.Blocks() as demo:
                 examples=["What is supervised learning?", "What is deep learning?", "What is a linear regression?"],
             )
         with gr.Column():
-            dropdown = gr.Dropdown([
-                "Datei 1",
-                "Datei 2",
-                "Datei 3"
-            ], label="Collection", info="Collection für Kontext auswählen")
+            dropdown = gr.Dropdown(label="Collection",
+                                   info="Collection für Kontext auswählen",
+                                   choices=collections,
+                                   value=collections[0] if collections else None,
+                                   interactive=True)
             upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
-        upload_button.upload(upload_pdf, inputs=upload_button)
+        
+        upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
+        dropdown.change(set_collection, inputs=dropdown)
+    demo.load(update_dropdown, outputs=dropdown)
 demo.launch(debug=True)
+
+
