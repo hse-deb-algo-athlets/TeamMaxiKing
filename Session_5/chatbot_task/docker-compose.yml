@@ -22,6 +22,7 @@ services:
     container_name: backend
     environment:
       - INDEX_DATA=0
+      - MODEL_NAME=llama3.2
     depends_on:
       - chroma
       - ollama
@@ -32,7 +33,7 @@ services:
 
 
   chroma:
-    image: chromadb/chroma
+    image: chromadb/chroma:0.5.13
     volumes:
       - ./chroma:/chroma/.chroma/index
     ports:
@@ -50,12 +51,12 @@ services:
       - ./run_ollama.sh:/run_ollama.sh
     container_name: ollama
     tty: true
-    entrypoint: ["/bin/bash"]
-    command: ["/run_ollama.sh"]
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["( /bin/ollama serve & sleep 5; /bin/ollama run llama3.2 )"]
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
-      - MODEL_NAME=sam4096/qwen2tools:1.5b
+      - MODEL_NAME=llama3.2
     networks:
       - app-network
 
