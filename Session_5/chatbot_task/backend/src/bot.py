@@ -6,16 +6,13 @@ from uuid import uuid4
 import chromadb
 from chromadb.api import ClientAPI
 from chromadb.config import DEFAULT_DATABASE, DEFAULT_TENANT, Settings
-from langchain.memory import ConversationBufferMemory
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_core.chat_history import InMemoryChatMessageHistory
+from langchain_core.documents import Document
 from langchain_core.documents.base import Document
-from langchain_core.load.serializable import Serializable
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableSerializable
-from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_ollama import ChatOllama
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -59,7 +56,6 @@ class CustomChatBot:
         # Initialize the large language model (LLM) from Ollama
         # TODO: ADD HERE YOUR CODE
         self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
-
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
@@ -132,7 +128,7 @@ class CustomChatBot:
         logger.info("AI Book Loaded")
 
 
-    def _initialize_qa_rag_chain(self) -> RunnableSerializable[Serializable, str]:
+    def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """
         Set up the retrieval-augmented generation (RAG) pipeline for answering questions.
         
@@ -146,7 +142,7 @@ class CustomChatBot:
         """
         prompt_template = """
         You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know. Use three sentences maximum and keep the answer concise.
-
+        Context:
         <context>
         {context}
         </context>
@@ -155,19 +151,10 @@ class CustomChatBot:
 
         {question}"""
 
-        # ADD HERE YOUR CODE
         rag_prompt = ChatPromptTemplate.from_template(prompt_template)
-        
-        history = InMemoryChatMessageHistory()
-
-
-        def get_history():
-            return history
-
-        # ADD HERE YOUR CODE
         retriever = self.vector_db.as_retriever()
 
-        # ADD HERE YOUR CODE
+
         qa_rag_chain = (
             {"context": retriever | self._format_docs, "question": RunnablePassthrough()}
             | rag_prompt

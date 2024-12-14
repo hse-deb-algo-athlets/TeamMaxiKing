@@ -4,8 +4,10 @@ import traceback
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import (FastAPI, File, HTTPException, UploadFile, WebSocket,
+                     WebSocketDisconnect)
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from src.bot import CustomChatBot
 
 INDEX_DATA = bool(int(os.environ["INDEX_DATA"]))
@@ -27,7 +29,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         logger.info("Cleaning up chatbot instance.")
-        del app.state.chatbot
+        del app.state.chatbot 
 
 # Create FastAPI app and configure CORS
 app = FastAPI(lifespan=lifespan)
@@ -39,6 +41,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.post("/upload_pdf")
+async def upload_pdf(file: UploadFile = File(...)):    
+    upload_dir = "pdfs"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    filename = file.filename or "default.pdf"
+    file_path = os.path.join(upload_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+    return JSONResponse(content={"message": f"Datei '{filename}' erfolgreich hochgeladen!"})
+
+
+
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -61,6 +78,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     logger.info(f"Sending chunk: {chain_result}")
                     # Send the response chunk back to the client
                     await websocket.send_text(chain_result)
+
+                logger.info("Ende des Streams")
+                await websocket.close()
+                break
 
             except WebSocketDisconnect:
                 # Graceful handling of WebSocket disconnection
