@@ -47,6 +47,7 @@ class CollectionRequest(BaseModel):
     collection_name: str
 
 
+
 # Dateiupload
 @app.post("/upload_pdf")
 async def upload_pdf(file: UploadFile = File(...)):    
@@ -60,9 +61,10 @@ async def upload_pdf(file: UploadFile = File(...)):
             f.write(await file.read())
         
         app.state.chatbot.set_vector_db_collection(filename)
-        #TODO Aus Datei Fragen generieren
-        
-        
+
+        if True:
+            logger.debug("Lade Datei in Vector DB...")
+            app.state.chatbot.index_file_to_vector_db(file_path)
         return JSONResponse(content={"message": f"Datei '{filename}' erfolgreich hochgeladen!"})
     
     except Exception as e:
@@ -70,10 +72,15 @@ async def upload_pdf(file: UploadFile = File(...)):
     
 @app.get("/get_collections")
 def get_collections():
-    #TODO Rückgabe aller Collections
     collections = app.state.chatbot.get_vector_db_collections()
-    
     return collections
+
+
+@app.get("/get_current_collection")
+def get_current_collection():
+    collection = app.state.chatbot.get_current_collection()
+    return CollectionRequest(collection_name= collection)
+
 
 @app.post("/set_collection")
 def set_collection(request: CollectionRequest):
@@ -84,8 +91,8 @@ def set_collection(request: CollectionRequest):
 
 @app.put("/delete_collection")
 def delete_collection(collection_name: str):
-    #TODO Implementieren
-    return ""
+    result = app.state.chatbot.delete_collection(collection_name)
+    return result
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
