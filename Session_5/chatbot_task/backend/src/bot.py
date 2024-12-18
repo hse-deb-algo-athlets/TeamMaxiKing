@@ -52,13 +52,15 @@ class CustomChatBot:
             self._index_data_to_vector_db()
 
         # Initialize the document retriever
-        self.retriever = self.vector_db.as_retriever(k=3)
+        self.retriever = self.vector_db.as_retriever()
 
         # Initialize the large language model (LLM) from Ollama
         # TODO: ADD HERE YOUR CODE
         self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
+
+        self.questions = {}
 
 
     def _initialize_chroma_client(self) -> ClientAPI:
@@ -169,8 +171,8 @@ class CustomChatBot:
         loader = PyPDFLoader(file_path=path)
         pages = loader.load()
         pages_chunked = RecursiveCharacterTextSplitter(
-            #chunk_size=2000,
-            #chunk_overlap=200
+            chunk_size=3000,
+            chunk_overlap=300
             ).split_documents(pages)
         pages_chunked_cleaned = [self._clean_document_text(chunk) for chunk in pages_chunked]
 
@@ -206,6 +208,74 @@ class CustomChatBot:
         
         logger.info("AI Book loaded")
 
+
+
+    def _qa_generation_chain(self, chunk: str):
+        """
+        Pipeline um Fragen auf Chunk eines Embeddings zu generieren. Frage muss richtig formatiert werden für die Auswertung
+        """
+
+        promt_template = """
+        Du bist ein Assistent, der Fragen und Single-Choice-Antworten basierend auf einem gegebenen Text erstellt.
+        Struktur:
+        1. Generiere eine Frage, die den Inhalt des Texts testet.
+        2. Gib drei mögliche Antworten (A, B, C), wobei nur eine korrekt ist.
+        3. Markiere, welche Antwort korrekt ist.
+        
+        Befolge das folgende Format exakt wie geschrieben, verwende keine zusätzliche Formatierung. 
+        
+        Format:
+        Frage: [Deine generierte Frage]
+        A) [Antwort 1]
+        B) [Antwort 2]
+        C) [Antwort 3]
+        Korrekte Antwort: [z.B. A]
+
+        Hier ist der gegebene Text:
+        {context}
+        """
+        promt = ChatPromptTemplate.from_template(promt_template)
+
+        qa_chain = (
+            {"context" : RunnablePassthrough()}
+            | promt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+        output = qa_chain.invoke({"context":chunk})
+        return output
+    
+    def _parse_output(self, output):
+        pattern = r"Frage: (.*?)\nA\) (.*?)\nB\) (.*?)\nC\) (.*?)\nKorrekte Antwort: (.*?)$"
+        match = re.search(pattern, output, re.DOTALL)
+        if match:
+            return {
+                "Frage": match.group(1),
+                "Antworten": {
+                    "A": match.group(2),
+                    "B": match.group(3),
+                    "C": match.group(4),
+                },
+                "Korrekte_Antwort": match.group(5),
+            }
+        return None
+    
+    def generate_questions(self):
+        curr_collection_name = self.get_current_collection()
+        collection = self.client.get_collection(name=curr_collection_name)
+        
+        docs = collection.get()['documents'] or []
+        for i, doc in enumerate(docs):
+            logger.info(f"Generiere Frage {i} für: {doc}")
+            result = self._qa_generation_chain(doc)
+            logger.info(result)
+            
+            output = self._parse_output(result)
+            if output:
+                self.questions[i] = output
+
+        return self.questions
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """

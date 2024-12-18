@@ -46,8 +46,6 @@ app.add_middleware(
 class CollectionRequest(BaseModel):
     collection_name: str
 
-
-
 # Dateiupload
 @app.post("/upload_pdf")
 async def upload_pdf(file: UploadFile = File(...)):    
@@ -93,6 +91,11 @@ def set_collection(request: CollectionRequest):
 def delete_collection(collection_name: str):
     result = app.state.chatbot.delete_collection(collection_name)
     return result
+
+@app.post("/generate_questions")
+def generate_questions():
+    return app.state.chatbot.generate_questions()
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

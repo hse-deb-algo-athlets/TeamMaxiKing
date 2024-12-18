@@ -1,3 +1,4 @@
+import json
 import logging
 
 import gradio as gr
@@ -74,7 +75,22 @@ def set_collection(selected_collection: str):
         logger.info(f"Collection {selected_collection} ausgewählt")
     except:
         gr.Warning(f"Fehler beim Setzen von {selected_collection}")
-        
+
+def generate_questions():
+    """
+    Generieren von Fragen basierend auf der momentan ausgewählten Collection    
+    """
+    try:
+        url = base_url + "generate_questions"
+        response = requests.post(url)
+        response.raise_for_status()
+
+        data = response.json()
+        return json.dumps(data, indent=4)
+
+    except Exception as e:
+        gr.Warning(f"Fehler bei der Generierung von Fragen: {e}")
+
 def update_dropdown(selected_collection=None):
     """
     Aktualisiere das Dropdown-Menü mit neuen Collections und optional einer vorausgewählten Collection.
@@ -156,7 +172,11 @@ with gr.Blocks() as demo:
             
             upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
             dropdown.change(set_collection, inputs=dropdown)
-    
+    with gr.Tab("Quiz"):
+        gen_questions_button = gr.Button("Fragen generieren")
+        questions_output = gr.Code(label="Generierte Fragen:", language="json")
+       
+
     with gr.Tab("Statistik"):
         with gr.Row():
             st = gr.BarPlot(
@@ -167,11 +187,10 @@ with gr.Blocks() as demo:
                 color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
             )
         gr.Button("Statistik laden")
-    
     with gr.Tab("Verwaltung"):
         gr.Button("Collection löschen")
     
-    
+    gen_questions_button.click(generate_questions, outputs=questions_output)
     demo.load(update_dropdown, outputs=dropdown)
 demo.launch(debug=True)
 
