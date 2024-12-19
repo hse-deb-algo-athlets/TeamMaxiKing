@@ -153,7 +153,7 @@ with gr.Blocks() as demo:
                                     value=collections[0] if collections else None,
                                     interactive=True)
                 upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
-            
+                
             upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
             dropdown.change(set_collection, inputs=dropdown)
     
