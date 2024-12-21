@@ -76,6 +76,22 @@ def set_collection(selected_collection: str):
     except:
         gr.Warning(f"Fehler beim Setzen von {selected_collection}")
 
+def delete_collection(selected_collection:str):
+    try:
+        url = base_url + "delete_collection"
+        
+        data = {"collection_name": selected_collection}
+
+        response = requests.put(url, json=data)
+        response.raise_for_status()
+        logger.info(f"Collection {selected_collection} gelöscht")
+        gr.Info(f"Collection {selected_collection} gelöscht")
+        return True
+    except:
+        gr.Warning(f"Fehler beim Löschen von {selected_collection}")
+        return False
+
+
 def generate_questions():
     """
     Generieren von Fragen basierend auf der momentan ausgewählten Collection    
@@ -148,12 +164,18 @@ async def chat(message: str, history=[]):
 
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
-    collections = get_collections()
+    collections = get_collections() or []
+
+    collections_state =gr.State(collections) 
+
+    logger.info(f"Collections: {collections}, collection state {collections_state}")
+
+    
     gr.Markdown("### MaxiKing Chatbot")
     with gr.Tab("Chatbot"):
         with gr.Row():
             with gr.Column(scale=2):
-                gr.ChatInterface(
+                chatbot = gr.ChatInterface(
                     fn=chat,
                     chatbot=gr.Chatbot(height=400),  # Adjusted height for better usability
                     #textbox=gr.Textbox(placeholder="Ask me questions about your script...", container=False, scale=7),
@@ -188,10 +210,24 @@ with gr.Blocks() as demo:
             )
         gr.Button("Statistik laden")
     with gr.Tab("Verwaltung"):
-        gr.Button("Collection löschen")
+
+        @gr.render(inputs=collections_state)
+        def render_collections(collections):
+            for collection in collections:
+                with gr.Row():
+                    gr.Textbox(f"Collection {collection}", show_label=False, container=False)
+                    delete_btn = gr.Button("Löschen", scale=0, variant="stop")
+                    def delete(collection = collection):       
+                        logger.info(f"collection zum löschen: {collection}")  
+                        if delete_collection(str(collection)):
+                            collections.remove(collection)  
+                        return collections
+                        
+                    delete_btn.click(delete, None, [collections_state])
     
     gen_questions_button.click(generate_questions, outputs=questions_output)
     demo.load(update_dropdown, outputs=dropdown)
+    demo.load(get_collections, outputs=collections_state)
 demo.launch(debug=True)
 
 

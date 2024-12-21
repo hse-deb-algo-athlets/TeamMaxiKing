@@ -88,8 +88,8 @@ def set_collection(request: CollectionRequest):
     return {"message": f"Collection {collection_name} ausgewählt"}
 
 @app.put("/delete_collection")
-def delete_collection(collection_name: str):
-    result = app.state.chatbot.delete_collection(collection_name)
+def delete_collection(request: CollectionRequest):
+    result = app.state.chatbot.delete_collection(request.collection_name)
     return result
 
 @app.post("/generate_questions")
