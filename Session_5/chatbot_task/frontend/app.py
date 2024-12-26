@@ -166,7 +166,7 @@ async def chat(message: str, history=[]):
 with gr.Blocks() as demo:
     collections = get_collections() or []
 
-    collections_state =gr.State(collections) 
+    collections_state =gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
 
     logger.info(f"Collections: {collections}, collection state {collections_state}")
 
@@ -192,11 +192,13 @@ with gr.Blocks() as demo:
                                     interactive=True)
                 upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
             
-            upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
+            upload_button.upload(upload_pdf, inputs=upload_button, outputs=[dropdown, collections_state])
             dropdown.change(set_collection, inputs=dropdown)
     with gr.Tab("Quiz"):
         gen_questions_button = gr.Button("Fragen generieren")
         questions_output = gr.Code(label="Generierte Fragen:", language="json")
+        
+        gen_questions_button.click(generate_questions, outputs=questions_output)
        
 
     with gr.Tab("Statistik"):
@@ -210,22 +212,26 @@ with gr.Blocks() as demo:
             )
         gr.Button("Statistik laden")
     with gr.Tab("Verwaltung"):
-
+        #Automatisches generieren der Buttons zum Löschen von Collections
+        #TODO: Beim Upload einer neuen Datei State ändern, dass Tab neu gerendert wird
         @gr.render(inputs=collections_state)
         def render_collections(collections):
             for collection in collections:
+                #Für jede Collection einen Button erstellen
                 with gr.Row():
                     gr.Textbox(f"Collection {collection}", show_label=False, container=False)
                     delete_btn = gr.Button("Löschen", scale=0, variant="stop")
+                    
                     def delete(collection = collection):       
-                        logger.info(f"collection zum löschen: {collection}")  
-                        if delete_collection(str(collection)):
-                            collections.remove(collection)  
-                        return collections
-                        
-                    delete_btn.click(delete, None, [collections_state])
+                        #Überprüfung ob Collection ohne Fehler gelöscht wurde, nur dann diese aus der Ansicht entfernen
+                        if delete_collection(str(collection)): 
+                            collections.remove(collection) #Collection aus State löschen damit neu gerendert wird
+
+                        dropdown = update_dropdown()    #Dropdown aktualiseren
+                        return collections, dropdown
+                         
+                    delete_btn.click(delete, None, [collections_state, dropdown])
     
-    gen_questions_button.click(generate_questions, outputs=questions_output)
     demo.load(update_dropdown, outputs=dropdown)
     demo.load(get_collections, outputs=collections_state)
 demo.launch(debug=True)
