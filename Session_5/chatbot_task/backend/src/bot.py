@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -56,7 +57,7 @@ class CustomChatBot:
 
         # Initialize the large language model (LLM) from Ollama
         # TODO: ADD HERE YOUR CODE
-        self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
+        self.llm = ChatOllama(model="llama3.2:1b", base_url="http://ollama:11434")
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
@@ -214,26 +215,29 @@ class CustomChatBot:
         """
         Pipeline um Fragen auf Chunk eines Embeddings zu generieren. Frage muss richtig formatiert werden für die Auswertung
         """
-
         promt_template = """
         Du bist ein Assistent, der Fragen und Single-Choice-Antworten basierend auf einem gegebenen Text erstellt.
         Struktur:
         1. Generiere eine Frage, die den Inhalt des Texts testet.
         2. Gib drei mögliche Antworten (A, B, C), wobei nur eine korrekt ist.
-        3. Markiere, welche Antwort korrekt ist.
-        
+        3. Wähle die korrekte Ergebnis (A, B oder C) aus.
+        4. Erklaerung: warum die korrekte Antwort richtig ist (kurz und prägnant).
+
+
         Befolge das folgende Format exakt wie geschrieben, verwende keine zusätzliche Formatierung. 
-        
+
         Format:
-        Frage: [Deine generierte Frage]
-        A) [Antwort 1]
-        B) [Antwort 2]
-        C) [Antwort 3]
-        Korrekte Antwort: [z.B. A]
+        
+        Frage: {{[Deine generierte Frage]}}
+        A) {{[Antwort 1]}}
+        B) {{[Antwort 2]}}
+        C) {{[Antwort 3]}}
+        Erklaerung: {{[Erklaerung hier]}}
 
         Hier ist der gegebene Text:
         {context}
         """
+
         promt = ChatPromptTemplate.from_template(promt_template)
 
         qa_chain = (
@@ -243,11 +247,13 @@ class CustomChatBot:
             | StrOutputParser()
         )
         
-        output = qa_chain.invoke({"context":chunk})
+        output = qa_chain.invoke({"context": chunk})
         return output
     
     def _parse_output(self, output):
-        pattern = r"Frage: (.*?)\nA\) (.*?)\nB\) (.*?)\nC\) (.*?)\nKorrekte Antwort: (.*?)$"
+        logger.info(f"Generierte Frage: {output}")
+        pattern = r"Frage:\s*(.*?)\nA\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*?)\nErklaerung:\s*(.*?)$"
+
         match = re.search(pattern, output, re.DOTALL)
         if match:
             return {
@@ -257,25 +263,29 @@ class CustomChatBot:
                     "B": match.group(3),
                     "C": match.group(4),
                 },
-                "Korrekte_Antwort": match.group(5),
+                "Erklaerung": match.group(5),
             }
-        return None
+        return None 
+        
     
     def generate_questions(self):
         curr_collection_name = self.get_current_collection()
         collection = self.client.get_collection(name=curr_collection_name)
-        
+    
+        output_list = []
         docs = collection.get()['documents'] or []
-        for i, doc in enumerate(docs):
-            logger.info(f"Generiere Frage {i} für: {doc}")
+        for doc in docs:
+            # logger.info(f"Generiere Frage {i} für: {doc}")
             result = self._qa_generation_chain(doc)
             logger.info(result)
-            
+        
             output = self._parse_output(result)
+            
             if output:
-                self.questions[i] = output
-
-        return self.questions
+                output_list.append(output)
+    
+        # logger.info(f"Generierte Fragen: {self.questions}")
+        return json.dumps(output_list)  # Konvertierung zu JSON-String
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """

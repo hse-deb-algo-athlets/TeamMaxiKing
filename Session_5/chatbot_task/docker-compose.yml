@@ -43,7 +43,7 @@ services:
       - app-network
 
   ollama:
-    image: ollama/ollama
+    image: ollama/ollama:0.5.4
     ports:
       - 11434:11434
     volumes:
@@ -52,11 +52,11 @@ services:
     container_name: ollama
     tty: true
     entrypoint: ["/bin/bash", "-c"]
-    command: ["( /bin/ollama serve & sleep 5; /bin/ollama run llama3.2 )"]
+    command: ["( /bin/ollama serve & sleep 5; /bin/ollama run llama3.2:1b )"]
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
-      - MODEL_NAME=llama3.2
+      - MODEL_NAME=llama3.2:1b
     networks:
       - app-network
 

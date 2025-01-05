@@ -14,6 +14,10 @@ base_url = "http://backend:5001/"
 
 current_selected_collection = ""
 
+current_question_index = 0
+questions = []
+correct_answers = []
+
 #Platzhalter
 stats = pd.DataFrame(
   {
@@ -86,7 +90,9 @@ def generate_questions():
         response.raise_for_status()
 
         data = response.json()
-        return json.dumps(data, indent=4)
+        if isinstance(data, str):  # Falls Backend String liefert, dekodieren
+            data = json.loads(data)
+        return data
 
     except Exception as e:
         gr.Warning(f"Fehler bei der Generierung von Fragen: {e}")
@@ -146,6 +152,65 @@ async def chat(message: str, history=[]):
         message = f"Error: {e}"
         yield message
 
+def handle_question_generation():
+    """Lädt die Fragen und setzt den Index zurück."""
+    global questions, correct_answers, current_question_index
+
+    # Fragen vom Backend abrufen
+    data = generate_questions()
+    if not data or not isinstance(data, list):  # Prüfen, ob Daten vorhanden und eine Liste sind
+        gr.Warning("Keine Fragen generiert oder ungültiges Format erhalten.")
+        questions = []  # Leere Liste als Fallback
+        correct_answers = []
+        return ("Keine Frage", "", "", "", "", "")
+
+    # Fragen und Antworten initialisieren
+    questions = data
+    correct_answers = [q.get("Ergebnis", "") for q in questions]  # Verhindert KeyError
+    current_question_index = 0
+
+    # Erste Frage anzeigen
+    return show_question(0)
+
+def show_question(index):
+    """Zeigt die Frage und Antworten für den gegebenen Index."""
+    if not questions or index >= len(questions):  # Sicherstellen, dass Fragen vorhanden sind
+        return ("Keine weiteren Fragen.", "", "", "", "", "")
+
+    # Aktuelle Frage extrahieren
+    question = questions[index]
+    return (
+        question.get("Frage", "Keine Frage verfügbar"),  # Default-Werte, falls Keys fehlen
+        question.get("Antworten", {}).get("A", ""),
+        question.get("Antworten", {}).get("B", ""),
+        question.get("Antworten", {}).get("C", ""),
+        question.get("Erklaerung", ""),
+        ""
+    )
+
+def check_answer(answer: str):
+    """Überprüft die Antwort und zeigt Feedback an."""
+    global current_question_index
+
+    is_last_question = current_question_index == len(questions) - 1
+
+    correct = correct_answers[current_question_index]
+    is_correct = answer == correct
+
+    # Ergebnis anzeigen
+    if is_correct:
+        gr.Info("Korrekt!")
+    else:
+        gr.Warning("Falsch!")
+
+# Fortschreiten zur nächsten Frage oder Abschluss anzeigen
+    if is_last_question:
+        return ("Alle Fragen beantwortet!", "", "", "", "", "")  # Klarer Abschluss
+
+    # Index erst nach Überprüfung erhöhen
+    current_question_index += 1
+    return show_question(current_question_index)
+        
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
     collections = get_collections()
@@ -171,10 +236,43 @@ with gr.Blocks() as demo:
                 upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
             
             upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
-            dropdown.change(set_collection, inputs=dropdown)
+            dropdown.change(set_collection, inputs=dropdown)    
+            
     with gr.Tab("Quiz"):
+    # Button zum Generieren von Fragen
         gen_questions_button = gr.Button("Fragen generieren")
-        questions_output = gr.Code(label="Generierte Fragen:", language="json")
+
+    # Spalte für generierte Fragen
+        with gr.Column():
+            question_output = gr.Textbox(label="Frage:", interactive=False)
+            
+
+        # Antworten
+            with gr.Row():
+                answer_button_A = gr.Button(value="A")
+                answer_button_B = gr.Button(value="B")
+                answer_button_C = gr.Button(value="C")
+
+        # Erklärung ausklappbar
+            with gr.Accordion("Erklärung anzeigen", open=False):
+                    explanation_output = gr.Textbox(label="Erklärung:", interactive=False)
+
+    # Aktionen zuweisen
+        gen_questions_button.click(
+            handle_question_generation,
+            outputs=[question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output]
+        )
+
+        answer_button_A.click(lambda: check_answer("A"), outputs=[
+            question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
+        ])
+        answer_button_B.click(lambda: check_answer("B"), outputs=[
+            question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
+        ])
+        answer_button_C.click(lambda: check_answer("C"), outputs=[
+            question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
+        ])
+
        
 
     with gr.Tab("Statistik"):
@@ -189,10 +287,11 @@ with gr.Blocks() as demo:
         gr.Button("Statistik laden")
     with gr.Tab("Verwaltung"):
         gr.Button("Collection löschen")
+        gen_questions_button.click(generate_questions, outputs=question_output)
+        demo.load(update_dropdown, outputs=dropdown)
     
-    gen_questions_button.click(generate_questions, outputs=questions_output)
-    demo.load(update_dropdown, outputs=dropdown)
-demo.launch(debug=True)
+    
+    demo.launch(debug=True)
 
 
 
