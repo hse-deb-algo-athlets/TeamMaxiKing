@@ -80,6 +80,22 @@ def set_collection(selected_collection: str):
     except:
         gr.Warning(f"Fehler beim Setzen von {selected_collection}")
 
+def delete_collection(selected_collection:str):
+    try:
+        url = base_url + "delete_collection"
+        
+        data = {"collection_name": selected_collection}
+
+        response = requests.put(url, json=data)
+        response.raise_for_status()
+        logger.info(f"Collection {selected_collection} gelöscht")
+        gr.Info(f"Collection {selected_collection} gelöscht")
+        return True
+    except:
+        gr.Warning(f"Fehler beim Löschen von {selected_collection}")
+        return False
+
+
 def generate_questions():
     """
     Generieren von Fragen basierend auf der momentan ausgewählten Collection    
@@ -213,12 +229,18 @@ def check_answer(answer: str):
         
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
-    collections = get_collections()
+    collections = get_collections() or []
+
+    collections_state =gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
+
+    logger.info(f"Collections: {collections}, collection state {collections_state}")
+
+    
     gr.Markdown("### MaxiKing Chatbot")
     with gr.Tab("Chatbot"):
         with gr.Row():
             with gr.Column(scale=2):
-                gr.ChatInterface(
+                chatbot = gr.ChatInterface(
                     fn=chat,
                     chatbot=gr.Chatbot(height=400),  # Adjusted height for better usability
                     #textbox=gr.Textbox(placeholder="Ask me questions about your script...", container=False, scale=7),
@@ -235,9 +257,8 @@ with gr.Blocks() as demo:
                                     interactive=True)
                 upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
             
-            upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
-            dropdown.change(set_collection, inputs=dropdown)    
-            
+            upload_button.upload(upload_pdf, inputs=upload_button, outputs=[dropdown, collections_state])
+            dropdown.change(set_collection, inputs=dropdown)
     with gr.Tab("Quiz"):
     # Button zum Generieren von Fragen
         gen_questions_button = gr.Button("Fragen generieren")
@@ -286,12 +307,29 @@ with gr.Blocks() as demo:
             )
         gr.Button("Statistik laden")
     with gr.Tab("Verwaltung"):
-        gr.Button("Collection löschen")
-        gen_questions_button.click(generate_questions, outputs=question_output)
-        demo.load(update_dropdown, outputs=dropdown)
+        #Automatisches generieren der Buttons zum Löschen von Collections
+        #TODO: Beim Upload einer neuen Datei State ändern, dass Tab neu gerendert wird
+        @gr.render(inputs=collections_state)
+        def render_collections(collections):
+            for collection in collections:
+                #Für jede Collection einen Button erstellen
+                with gr.Row():
+                    gr.Textbox(f"Collection {collection}", show_label=False, container=False)
+                    delete_btn = gr.Button("Löschen", scale=0, variant="stop")
+                    
+                    def delete(collection = collection):       
+                        #Überprüfung ob Collection ohne Fehler gelöscht wurde, nur dann diese aus der Ansicht entfernen
+                        if delete_collection(str(collection)): 
+                            collections.remove(collection) #Collection aus State löschen damit neu gerendert wird
+
+                        dropdown = update_dropdown()    #Dropdown aktualiseren
+                        return collections, dropdown
+                         
+                    delete_btn.click(delete, None, [collections_state, dropdown])
     
-    
-    demo.launch(debug=True)
+    demo.load(update_dropdown, outputs=dropdown)
+    demo.load(get_collections, outputs=collections_state)
+demo.launch(debug=True)
 
 
 

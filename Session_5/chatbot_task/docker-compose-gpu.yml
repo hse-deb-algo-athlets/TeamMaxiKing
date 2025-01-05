@@ -1,0 +1,72 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "7860:7860"
+    container_name: frontend
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    ports:
+      - "5001:5001"
+    container_name: backend
+    environment:
+      - INDEX_DATA=0
+      - MODEL_NAME=llama3.2
+    depends_on:
+      - chroma
+      - ollama
+    networks:
+      - app-network
+    volumes:
+      - ./backend:/app 
+
+
+  chroma:
+    image: chromadb/chroma:0.5.13
+    volumes:
+      - ./chroma:/chroma/.chroma/index
+    ports:
+      - "8000:8000"
+    container_name: chroma
+    networks:
+      - app-network
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - 11434:11434
+    volumes:
+      - ./ollama/ollama:/root/.ollama
+      - ./run_ollama.sh:/run_ollama.sh
+    container_name: ollama
+    tty: true
+    entrypoint: ["/bin/bash", "-c"]
+    command: ["( /bin/ollama serve & sleep 5; /bin/ollama run llama3.2 )"]
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0
+      - MODEL_NAME=llama3.2
+    networks:
+      - app-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  app-network:
+    driver: bridge

@@ -61,8 +61,6 @@ class CustomChatBot:
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
-        self.questions = {}
-
 
     def _initialize_chroma_client(self) -> ClientAPI:
         """
@@ -141,6 +139,9 @@ class CustomChatBot:
 
     def get_current_collection(self):
         collection = self.vector_db._collection_name
+
+        new_collection = self.get_vector_db_collections()[0] #Andere Collection auswählen, da die aktuelle gelöscht wurde
+        self.set_vector_db_collection(new_collection)
         return collection
 
     def delete_collection(self, collection: str):
@@ -150,7 +151,6 @@ class CustomChatBot:
         except Exception as e:
             logger.info("Collection existiert nicht")
             return f"Collection {collection} konnte nicht gelöscht werden: {e}"
-        
 
 
     def get_vector_db_collections(self): 
@@ -189,13 +189,8 @@ class CustomChatBot:
 
     def _index_data_to_vector_db(self):
         pdf_doc = "src/AI_Book.pdf"
-
-        # Create pdf data loader
-        # ADD HERE YOUR CODE
         loader = PyPDFLoader(file_path=pdf_doc)
 
-        # Load and split documents in chunks
-        # ADD HERE YOUR CODE
         pages = loader.load()
         pages_chunked = RecursiveCharacterTextSplitter(
             #chunk_size=1024,
@@ -220,19 +215,18 @@ class CustomChatBot:
         Struktur:
         1. Generiere eine Frage, die den Inhalt des Texts testet.
         2. Gib drei mögliche Antworten (A, B, C), wobei nur eine korrekt ist.
-        3. Wähle die korrekte Ergebnis (A, B oder C) aus.
-        4. Erklaerung: warum die korrekte Antwort richtig ist (kurz und prägnant).
-
-
+        3. Gib die korrekte Antwort aus.
+        4. Erklärung: Warum die korrekte Antwort richtig ist (kurz und prägnant).
+        
         Befolge das folgende Format exakt wie geschrieben, verwende keine zusätzliche Formatierung. 
 
         Format:
-        
-        Frage: {{[Deine generierte Frage]}}
-        A) {{[Antwort 1]}}
-        B) {{[Antwort 2]}}
-        C) {{[Antwort 3]}}
-        Erklaerung: {{[Erklaerung hier]}}
+        Frage: [Deine generierte Frage]
+        A) [Antwort 1]
+        B) [Antwort 2]
+        C) [Antwort 3]
+        Korrekte Antwort: [hier die korrekte Antwort markieren, z.B. A]
+        Erklärung: [Erklärung hier]
 
         Hier ist der gegebene Text:
         {context}
@@ -263,29 +257,40 @@ class CustomChatBot:
                     "B": match.group(3),
                     "C": match.group(4),
                 },
-                "Erklaerung": match.group(5),
+                "Erklärung": match.group(5),
             }
         return None 
         
     
-    def generate_questions(self):
-        curr_collection_name = self.get_current_collection()
-        collection = self.client.get_collection(name=curr_collection_name)
-    
-        output_list = []
-        docs = collection.get()['documents'] or []
-        for doc in docs:
-            # logger.info(f"Generiere Frage {i} für: {doc}")
-            result = self._qa_generation_chain(doc)
-            logger.info(result)
+    def generate_questions(self, collection_name = None):
+        questions = {}
         
-            output = self._parse_output(result)
+        # Laden der ausgewählten Collection
+        curr_collection_name = collection_name or self.get_current_collection()
+        collection = self.client.get_collection(name=curr_collection_name)
+        
+        docs = collection.get()['documents'] or [] 
+        
+        # Durch jedes Embedding in der Collection iterieren und Frage erstellen
+        for i, doc in enumerate(docs):
+            logger.info(f"Generiere Frage {i}")
             
-            if output:
-                output_list.append(output)
-    
-        # logger.info(f"Generierte Fragen: {self.questions}")
-        return json.dumps(output_list)  # Konvertierung zu JSON-String
+            # 3 Versuche für die Generierung einer korrekt formatierten Frage
+            for k in range(3):      
+                result = self._qa_generation_chain(doc)
+                logger.info(result)
+                
+                # Parsen der QA Chain Ausgabe in JSON
+                output = self._parse_output(result)
+                
+                if output:
+                    questions[i] = output
+                    break   # Aus der For-Schleife herausspringen, wenn Frage ausgewertet werden konnte
+                
+                else:
+                    print(f"Keine gültige Antwort für Frage {i} erhalten, versuche erneut... ({k})")
+
+        return questions
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """
@@ -336,8 +341,8 @@ class CustomChatBot:
             str: A string containing the concatenated content of all retrieved documents.
         """
 
-        for i, doc in enumerate(docs):
-            logger.info(f"Dokument {i+1}: {doc.page_content}, Metadaten: {doc.metadata}")
+        #for i, doc in enumerate(docs):
+        #    logger.info(f"Dokument {i+1}: {doc.page_content}, Metadaten: {doc.metadata}")
 
         return "\n\n".join(doc.page_content for doc in docs)
 
