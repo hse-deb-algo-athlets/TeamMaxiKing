@@ -182,7 +182,7 @@ def handle_question_generation():
 
     # Fragen und Antworten initialisieren
     questions = data
-    correct_answers = [q.get("Ergebnis", "") for q in questions]  # Verhindert KeyError
+    correct_answers = [q.get("Korrekte_Antwort", "") for q in questions]  # Verhindert KeyError
     current_question_index = 0
 
     # Erste Frage anzeigen
@@ -210,16 +210,16 @@ def check_answer(answer: str):
 
     is_last_question = current_question_index == len(questions) - 1
 
-    correct = correct_answers[current_question_index]
-
-    
+    correct = correct_answers[current_question_index].split(" ")[0]
+    frage = questions[current_question_index].get("Frage", "Keine Frage verfügbar") 
+    logger.info(f"Antwort: {answer}, Korrekt: {correct}")
     is_correct = answer == correct
 
     # Ergebnis anzeigen
     if is_correct:
         gr.Info("Korrekt!")
     else:
-        gr.Warning("Falsch!")
+        gr.Warning(f"Falsch! Die richtige Antwort wäre: {correct}:{frage}")
 
 # Fortschreiten zur nächsten Frage oder Abschluss anzeigen
     if is_last_question:
@@ -286,13 +286,13 @@ with gr.Blocks() as demo:
             outputs=[question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output]
         )
 
-        answer_button_A.click(lambda: check_answer("A"), outputs=[
+        answer_button_A.click(lambda: check_answer("A)"), outputs=[
             question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
         ])
-        answer_button_B.click(lambda: check_answer("B"), outputs=[
+        answer_button_B.click(lambda: check_answer("B)"), outputs=[
             question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
         ])
-        answer_button_C.click(lambda: check_answer("C"), outputs=[
+        answer_button_C.click(lambda: check_answer("C)"), outputs=[
             question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
         ])
 

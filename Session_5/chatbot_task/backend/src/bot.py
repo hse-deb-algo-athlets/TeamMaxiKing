@@ -215,7 +215,7 @@ class CustomChatBot:
         Struktur:
         1. Generiere eine Frage, die den Inhalt des Texts testet.
         2. Gib drei mögliche Antworten (A, B, C), wobei nur eine korrekt ist.
-        3. Gib die korrekte Antwort aus.
+        3. Gib den Buchstaben der korrekten Antwort aus (zum Beispiel A) )
         4. Erklärung: Warum die korrekte Antwort richtig ist (kurz und prägnant).
         
         Befolge das folgende Format exakt wie geschrieben, verwende keine zusätzliche Formatierung. 
@@ -246,7 +246,7 @@ class CustomChatBot:
     
     def _parse_output(self, output):
         logger.info(f"Generierte Frage: {output}")
-        pattern = r"Frage:\s*(.*?)\nA\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*?)\nErklärung:\s*(.*?)$"
+        pattern = r"Frage: (.*?)\nA\) (.*?)\nB\) (.*?)\nC\) (.*?)\nKorrekte Antwort: (.*?)\nErklärung: (.*?)$"
 
         match = re.search(pattern, output, re.DOTALL)
         if match:
@@ -257,11 +257,9 @@ class CustomChatBot:
                     "B": match.group(3),
                     "C": match.group(4),
                 },
-                "Erklärung": match.group(5),
+                "Korrekte_Antwort": match.group(5),
+                "Erklärung": match.group(6),
             }
-        return None 
-        
-    
     def generate_questions(self, collection_name = None):
         
         # Laden der ausgewählten Collection
