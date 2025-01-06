@@ -200,7 +200,7 @@ def show_question(index):
         question.get("Antworten", {}).get("A", ""),
         question.get("Antworten", {}).get("B", ""),
         question.get("Antworten", {}).get("C", ""),
-        question.get("Erklaerung", ""),
+        question.get("Erklärung", ""),
         ""
     )
 
@@ -211,6 +211,8 @@ def check_answer(answer: str):
     is_last_question = current_question_index == len(questions) - 1
 
     correct = correct_answers[current_question_index]
+
+    
     is_correct = answer == correct
 
     # Ergebnis anzeigen
@@ -270,9 +272,9 @@ with gr.Blocks() as demo:
 
         # Antworten
             with gr.Row():
-                answer_button_A = gr.Button(value="A")
-                answer_button_B = gr.Button(value="B")
-                answer_button_C = gr.Button(value="C")
+                answer_button_A = gr.Button(value="A)")
+                answer_button_B = gr.Button(value="B)")
+                answer_button_C = gr.Button(value="C)")
 
         # Erklärung ausklappbar
             with gr.Accordion("Erklärung anzeigen", open=False):

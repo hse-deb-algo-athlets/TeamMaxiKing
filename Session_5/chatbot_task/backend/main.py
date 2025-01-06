@@ -82,7 +82,6 @@ def get_current_collection():
 
 @app.post("/set_collection")
 def set_collection(request: CollectionRequest):
-    # TODO Setzen der Collection die verwendet werden soll (VectorDB neu initialisieren mit neuer collection)
     collection_name = request.collection_name
     app.state.chatbot.set_vector_db_collection(collection_name)
     return {"message": f"Collection {collection_name} ausgewählt"}

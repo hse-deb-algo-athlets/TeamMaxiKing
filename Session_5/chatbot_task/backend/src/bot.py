@@ -57,7 +57,7 @@ class CustomChatBot:
 
         # Initialize the large language model (LLM) from Ollama
         # TODO: ADD HERE YOUR CODE
-        self.llm = ChatOllama(model="llama3.2:1b", base_url="http://ollama:11434")
+        self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
@@ -225,7 +225,7 @@ class CustomChatBot:
         A) [Antwort 1]
         B) [Antwort 2]
         C) [Antwort 3]
-        Korrekte Antwort: [hier die korrekte Antwort markieren, z.B. A]
+        Korrekte Antwort: [hier die korrekte Antwort markieren, z.B. A)]
         Erklärung: [Erklärung hier]
 
         Hier ist der gegebene Text:
@@ -246,7 +246,7 @@ class CustomChatBot:
     
     def _parse_output(self, output):
         logger.info(f"Generierte Frage: {output}")
-        pattern = r"Frage:\s*(.*?)\nA\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*?)\nErklaerung:\s*(.*?)$"
+        pattern = r"Frage:\s*(.*?)\nA\)\s*(.*?)\nB\)\s*(.*?)\nC\)\s*(.*?)\nErklärung:\s*(.*?)$"
 
         match = re.search(pattern, output, re.DOTALL)
         if match:
@@ -263,12 +263,11 @@ class CustomChatBot:
         
     
     def generate_questions(self, collection_name = None):
-        questions = {}
         
         # Laden der ausgewählten Collection
         curr_collection_name = collection_name or self.get_current_collection()
         collection = self.client.get_collection(name=curr_collection_name)
-        
+        output_list = []
         docs = collection.get()['documents'] or [] 
         
         # Durch jedes Embedding in der Collection iterieren und Frage erstellen
@@ -284,13 +283,13 @@ class CustomChatBot:
                 output = self._parse_output(result)
                 
                 if output:
-                    questions[i] = output
+                    output_list.append(output)
                     break   # Aus der For-Schleife herausspringen, wenn Frage ausgewertet werden konnte
                 
                 else:
                     print(f"Keine gültige Antwort für Frage {i} erhalten, versuche erneut... ({k})")
 
-        return questions
+        return json.dumps(output_list)
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """
