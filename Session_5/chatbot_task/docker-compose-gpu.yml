@@ -31,6 +31,7 @@ services:
     volumes:
       - ./backend:/app 
 
+
   chroma:
     image: chromadb/chroma:0.5.13
     volumes:
@@ -42,11 +43,12 @@ services:
       - app-network
 
   ollama:
-    image: dustynv/ollama:r36.4.0
+    image: ollama/ollama
     ports:
       - 11434:11434
     volumes:
       - ./ollama/ollama:/root/.ollama
+      - ./run_ollama.sh:/run_ollama.sh
     container_name: ollama
     tty: true
     entrypoint: ["/bin/bash", "-c"]
@@ -54,6 +56,7 @@ services:
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
+      - MODEL_NAME=llama3.2
     networks:
       - app-network
     deploy:

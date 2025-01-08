@@ -19,13 +19,13 @@ This setup will serve as the foundation for storing and retrieving vector embedd
 1. **Pull the ChromaDB Docker Image**
 
    ```bash
-   docker pull chromadb/chroma
+   docker pull chromadb/chroma:0.5.13
    ```
 
 2. **Run the ChromaDB Container**
 
    ```bash
-   docker run -d -p 8000:8000 chromadb/chroma
+   docker run -d -p 8000:8000 chromadb/chroma:0.5.13
    ```
 
    - **Optional Flags and Environment Variables:**
@@ -45,7 +45,7 @@ docker run -d \
   -v /local/path/to/data:/chroma/chroma \
   -e IS_PERSISTENT=TRUE \
   -e PERSIST_DIRECTORY=/chroma/chroma \
-  chromadb/chroma
+  chromadb/chroma:0.5.13
 ```
 
 - Replace `/local/path/to/data` with the path to a directory on your local machine where you want ChromaDB to store data.
