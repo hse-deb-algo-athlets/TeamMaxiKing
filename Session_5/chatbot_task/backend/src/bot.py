@@ -24,6 +24,7 @@ logger.setLevel(logging.INFO)
 
 # TODO: Implement the functions of the CustomChatBot Class. Use the knowledge and code from Session_4
 
+
 class CustomChatBot:
     """
     A class representing a chatbot that uses a ChromaDB client for document retrieval
@@ -40,11 +41,12 @@ class CustomChatBot:
         and the ChatOllama language model for answer generation.
         """
         # Initialize the embedding function for document retrieval
-        self.embedding_function = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2", cache_folder="/embedding_model")
-        
+        self.embedding_function = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-mpnet-base-v2", cache_folder="/embedding_model")
+
         # Initialize the ChromaDB client
         self.client = self._initialize_chroma_client()
-        
+
         # Get or create the document collection in ChromaDB
         self.vector_db = self._initialize_vector_db()
 
@@ -56,7 +58,6 @@ class CustomChatBot:
 
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
-
 
     def _initialize_chroma_client(self) -> ClientAPI:
         """
@@ -96,12 +97,12 @@ class CustomChatBot:
             embedding_function=self.embedding_function
         )
         return vector_db_from_client
-    
-    #Collection Name anpassen falls ungültige Zeichen enthalten sind
+
+    # Collection Name anpassen falls ungültige Zeichen enthalten sind
     def _validate_and_adjust_collection_name(self, name: str) -> str:
         pdf_name = os.path.splitext(name)[0]
         adjusted_name = re.sub(r"[^a-zA-Z0-9_-]", "", pdf_name)
-        
+
         if adjusted_name and not adjusted_name[0].isalnum():
             adjusted_name = re.sub(r"^[^a-zA-Z0-9]+", "", adjusted_name)
         if adjusted_name and not adjusted_name[-1].isalnum():
@@ -111,10 +112,11 @@ class CustomChatBot:
         elif len(adjusted_name) > 63:
             adjusted_name = adjusted_name[:63]
         return adjusted_name
-    
+
     def set_vector_db_collection(self, collection: str):
-        
-        adjusted_collection_name = self._validate_and_adjust_collection_name(collection)
+
+        adjusted_collection_name = self._validate_and_adjust_collection_name(
+            collection)
         logger.info(f"Setting new collection: {adjusted_collection_name}")
 
         self.client.get_or_create_collection(adjusted_collection_name)
@@ -126,14 +128,15 @@ class CustomChatBot:
         )
 
         self.vector_db = vector_db_from_client
-        
-        #RAG Chain neu initialisieren mit neuer Vector DB
+
+        # RAG Chain neu initialisieren mit neuer Vector DB
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
     def get_current_collection(self):
         collection = self.vector_db._collection_name
 
-        new_collection = self.get_vector_db_collections()[0] #Andere Collection auswählen, da die aktuelle gelöscht wurde
+        # Andere Collection auswählen, da die aktuelle gelöscht wurde
+        new_collection = self.get_vector_db_collections()[0]
         self.set_vector_db_collection(new_collection)
         return collection
 
@@ -145,37 +148,31 @@ class CustomChatBot:
             logger.info("Collection existiert nicht")
             return f"Collection {collection} konnte nicht gelöscht werden: {e}"
 
-
-    def get_vector_db_collections(self): 
+    def get_vector_db_collections(self):
         collections = self.client.list_collections()
         collection_names = [collection.name for collection in collections]
         return collection_names
 
     def _clean_document_text(self, chunk):
-            # Remove surrogate pairs
-            text = chunk.page_content
-            text = re.sub(r'[\ud800-\udfff]', '', text)
-            # Optionally remove non-ASCII characters (depends on your use case)
-            #text = re.sub(r'[^\x00-\x7F]+', '', text)
-            return Document(page_content=text, metadata=chunk.metadata)
-    
+        # Remove surrogate pairs
+        text = chunk.page_content
+        text = re.sub(r'[\ud800-\udfff]', '', text)
+        # Optionally remove non-ASCII characters (depends on your use case)
+        # text = re.sub(r'[^\x00-\x7F]+', '', text)
+        return Document(page_content=text, metadata=chunk.metadata)
+
     def index_file_to_vector_db(self, path: str):
         loader = PyPDFLoader(file_path=path)
         pages = loader.load()
         pages_chunked = RecursiveCharacterTextSplitter(
             chunk_size=3000,
             chunk_overlap=300
-            ).split_documents(pages)
-        pages_chunked_cleaned = [self._clean_document_text(chunk) for chunk in pages_chunked]
+        ).split_documents(pages)
+        pages_chunked_cleaned = [self._clean_document_text(
+            chunk) for chunk in pages_chunked]
 
-        for page in pages_chunked_cleaned:
-            logger.info(page.page_content)
-            logger.info("--------------------------------------------------")
-        
         uuids = [str(uuid4()) for _ in range(len(pages_chunked_cleaned))]
         self.vector_db.add_documents(documents=pages_chunked_cleaned, id=uuids)
-
-        logger.info(f"File {path} loaded")
 
     def _qa_generation_chain(self, chunk: str):
         """
@@ -206,17 +203,16 @@ class CustomChatBot:
         promt = ChatPromptTemplate.from_template(promt_template)
 
         qa_chain = (
-            {"context" : RunnablePassthrough()}
+            {"context": RunnablePassthrough()}
             | promt
             | self.llm
             | StrOutputParser()
         )
-        
+
         output = qa_chain.invoke({"context": chunk})
         return output
-    
+
     def _parse_output(self, output):
-        logger.info(f"Generierte Frage: {output}")
         pattern = r"Frage: (.*?)\nA\) (.*?)\nB\) (.*?)\nC\) (.*?)\nKorrekte Antwort: (.*?)\nErklärung: (.*?)$"
 
         match = re.search(pattern, output, re.DOTALL)
@@ -231,44 +227,44 @@ class CustomChatBot:
                 "Korrekte_Antwort": match.group(5),
                 "Erklärung": match.group(6),
             }
-    def generate_questions(self, collection_name = None):
-        
+
+    def generate_questions(self, collection_name=None):
+
         # Laden der ausgewählten Collection
         questions = {}
 
         curr_collection_name = collection_name or self.get_current_collection()
         collection = self.client.get_collection(name=curr_collection_name)
-        docs = collection.get()['documents'] or [] 
+        docs = collection.get()['documents'] or []
         # Durch jedes Embedding in der Collection iterieren und Frage erstellen
         for i, doc in enumerate(docs):
-            
+
             logger.info(f"Generiere Frage {i}")
             # 3 Versuche für die Generierung einer korrekt formatierten Frage
-            for k in range(3):      
+            for k in range(3):
                 result = self._qa_generation_chain(doc)
-                
+
                 # Parsen der QA Chain Ausgabe in JSON
                 output = self._parse_output(result)
-                
+
                 if output:
                     questions.update({i: output})
                     break   # Aus der For-Schleife herausspringen, wenn Frage ausgewertet werden konnte
-                
-                else:
-                    print(f"Keine gültige Antwort für Frage {i} erhalten, versuche erneut... ({k})")
-        logger.info(questions)
-        return questions
 
+                else:
+                    print(
+                        f"Keine gültige Antwort für Frage {i} erhalten, versuche erneut... ({k})")
+        return questions
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """
         Set up the retrieval-augmented generation (RAG) pipeline for answering questions.
-        
+
         The pipeline consists of:
         - Retrieving relevant documents from ChromaDB.
         - Formatting the retrieved documents for input into the language model (LLM).
         - Using the LLM to generate concise answers.
-        
+
         Returns:
             dict: The RAG pipeline configuration.
         """
@@ -284,20 +280,21 @@ class CustomChatBot:
         rag_prompt = ChatPromptTemplate.from_template(prompt_template)
         retriever = self.vector_db.as_retriever(
             search_kwargs={"k": 5}
-            )
+        )
 
         qa_rag_chain = (
-            {"context": retriever | self._format_docs, "question": RunnablePassthrough()}
+            {"context": retriever | self._format_docs,
+                "question": RunnablePassthrough()}
             | rag_prompt
             | self.llm
             | StrOutputParser()
         )
         return qa_rag_chain
-    
+
     def _format_docs(self, docs: List[Document]) -> str:
         """
         Helper function to format the retrieved documents into a single string.
-        
+
         Args:
             docs (List[Document]): A list of documents retrieved by ChromaDB.
 

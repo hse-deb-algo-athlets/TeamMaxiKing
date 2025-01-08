@@ -17,16 +17,12 @@ def upload_pdf(path: str):
     if not path:
         gr.Warning(f"Keine Datei ausgewählt")
 
-    logger.info(f"Dateipfad: {path}")
-
     url = base_url + "upload_pdf"
 
     with open(path, "rb") as f:
         logger.info("Datei geladen")
         files = {"file": f}
         response = requests.post(url, files=files)
-
-    logger.info(response.text)
 
     if response.status_code == 200:
         gr.Info(response.json().get('message', 'Upload erfolgreich'))
@@ -182,8 +178,6 @@ def show_question(questions: dict):
         answer_C = current_question["Antworten"]["C"]
         erklärung = current_question["Erklärung"]
 
-        logger.info(
-            f"Antwort A: {answer_A}, Antwort B: {answer_B}, Antwort C: {answer_C}, Erklärung: {erklärung}")
         return frage, answer_A, answer_B, answer_C, erklärung
 
 
@@ -215,13 +209,11 @@ def check_answer(selected_answer: str, questions: dict, stats: pd.DataFrame):
             gr.Warning(
                 f"Falsch! Die Richtige Antwort wäre {correct_answer}: {correct_answer_text}")
             stats.loc[stats["Bewertung"] == "Falsch", "Anzahl"] += 1
-        logger.info(f"Statistik: {stats}")
         return select_next_question(questions), update_stat_chart(stats)
     return questions, stats
 
 
 def update_stat_chart(stats):
-    logger.info(f"Statistik aktualisiert: {stats}")
     return gr.BarPlot(
         value=stats,
         x="Bewertung",
@@ -259,7 +251,6 @@ with gr.Blocks() as demo:
                 )
             with gr.Column():
                 dropdown = gr.Dropdown(label="Collection",
-<<<<<<< HEAD
                                        info="Collection für Kontext auswählen",
                                        choices=collections,
                                        value=collections[0] if collections else None,
@@ -269,15 +260,6 @@ with gr.Blocks() as demo:
 
             upload_button.upload(upload_pdf, inputs=upload_button, outputs=[
                                  dropdown, collections_state])
-=======
-                                    info="Collection für Kontext auswählen",
-                                    choices=collections,
-                                    value=collections[0] if collections else None,
-                                    interactive=True)
-                upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
-                
-            upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
->>>>>>> origin/Sessions
             dropdown.change(set_collection, inputs=dropdown)
     with gr.Tab("Quiz"):
         # Button zum Generieren von Fragen
