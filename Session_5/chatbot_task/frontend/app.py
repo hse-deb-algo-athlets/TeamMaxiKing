@@ -12,21 +12,13 @@ logger = logging.getLogger(__name__)
 
 base_url = "http://backend:5001/"
 
-current_selected_collection = ""
-
-current_question_index = 0
-questions = []
-correct_answers = []
-correct_count = 0
-wrong_count = 0
-
 
 def upload_pdf(path: str):
     if not path:
-        gr.Warning(f"Keine Datei ausgewählt")   
-    
+        gr.Warning(f"Keine Datei ausgewählt")
+
     logger.info(f"Dateipfad: {path}")
-    
+
     url = base_url + "upload_pdf"
 
     with open(path, "rb") as f:
@@ -38,16 +30,13 @@ def upload_pdf(path: str):
 
     if response.status_code == 200:
         gr.Info(response.json().get('message', 'Upload erfolgreich'))
-        #TODO Geuploadete Collection auswählen im Dropdown
-<<<<<<< HEAD
-        return  update_dropdown()
-=======
+        # TODO Geuploadete Collection auswählen im Dropdown
 
-        return  update_dropdown(), get_collections()
->>>>>>> origin/QA-Frontend
+        return update_dropdown(), get_collections()
     else:
         gr.Warning(response.json().get('message', 'Fehler beim Upload'))
-    
+
+
 def get_collections():
     """
     Abfragen der Collections die in der ChromaDB gespeichert sind
@@ -64,6 +53,7 @@ def get_collections():
         gr.Warning(f"Fehler beim Collections laden: {e}")
         return []
 
+
 def set_collection(selected_collection: str):
     """
     Setzen der Collection die für die RAG Chain verwendet werden soll
@@ -77,10 +67,11 @@ def set_collection(selected_collection: str):
     except Exception as e:
         gr.Warning(f"Fehler beim Setzen von {selected_collection}: {e} ")
 
-def delete_collection(selected_collection:str):
+
+def delete_collection(selected_collection: str):
     try:
         url = base_url + "delete_collection"
-        
+
         data = {"collection_name": selected_collection}
 
         response = requests.put(url, json=data)
@@ -111,6 +102,7 @@ def generate_questions() -> dict:
         gr.Warning(f"Fehler bei der Generierung von Fragen: {e}")
         return {}
 
+
 def update_dropdown(selected_collection=None):
     """
     Aktualisiere das Dropdown-Menü mit neuen Collections und optional einer vorausgewählten Collection.
@@ -119,12 +111,15 @@ def update_dropdown(selected_collection=None):
         curr_collection = requests.get(base_url + "get_current_collection")
         name = curr_collection.json()['collection_name']
         selected_collection = name
-        
+
     new_choices = get_collections()
-    selected_value = selected_collection if selected_collection else (new_choices[0] if new_choices else None)
+    selected_value = selected_collection if selected_collection else (
+        new_choices[0] if new_choices else None)
     return gr.Dropdown(choices=new_choices, value=selected_value)
 
 # WebSocket chat function (asynchronous generator)
+
+
 async def websocket_chat(message: str):
     uri = "ws://backend:5001/ws"
     try:
@@ -150,12 +145,14 @@ async def websocket_chat(message: str):
         yield f"Error: {str(e)}"
 
 # Chat function to update the chatbot message history
+
+
 async def chat(message: str, history=[]):
     if not message.strip():
         yield "Please enter a valid question."
         return
 
-    try:        
+    try:
         # Stream chunks from WebSocket and append them incrementally
         bot_message = ""
         async for chunk in websocket_chat(message):
@@ -165,57 +162,19 @@ async def chat(message: str, history=[]):
     except Exception as e:
         yield f"Fehler: {e}"
 
-def handle_question_generation2():
+
+def handle_question_generation():
     data = generate_questions()
     return data
 
+
 def show_question(questions: dict):
 
-    logger.info(f"Questions: {questions}")
-
-<<<<<<< HEAD
-def show_question(index):
-    """Zeigt die Frage und Antworten für den gegebenen Index."""
-    if not questions or index >= len(questions):  # Sicherstellen, dass Fragen vorhanden sind
-        return ("Keine weiteren Fragen.", "", "", "", "", "")
-
-    # Aktuelle Frage extrahieren
-    question = questions[index]
-    return (
-        question.get("Frage", "Keine Frage verfügbar"),  # Default-Werte, falls Keys fehlen
-        question.get("Antworten", {}).get("A", ""),
-        question.get("Antworten", {}).get("B", ""),
-        question.get("Antworten", {}).get("C", ""),
-        question.get("Erklärung", ""),
-        ""
-    )
-
-def check_answer(answer: str):
-    """Überprüft die Antwort und zeigt Feedback an."""
-    global current_question_index, correct_count, wrong_count, stats
-
-    is_last_question = current_question_index == len(questions) - 1
-
-    correct = correct_answers[current_question_index].split(" ")[0]
-    frage = questions[current_question_index].get("Frage", "Keine Frage verfügbar") 
-    logger.info(f"Antwort: {answer}, Korrekt: {correct}")
-    is_correct = answer == correct
-
-    # Ergebnis anzeigen
-    if is_correct:
-        gr.Info("Korrekt!")
-        correct_count += 1
-    else:
-        gr.Warning(f"Falsch! Die richtige Antwort wäre: {correct}:{frage}")
-        wrong_count += 1
-
-=======
     if not questions:
         return ("Alle Fragen beantwortet!", " - ", " - ", " - ", " - ", " - ")
     else:
         first_key = list(questions.keys())[0]
         current_question = questions[first_key]
->>>>>>> origin/QA-Frontend
 
         frage = current_question["Frage"]
         answer_A = current_question["Antworten"]["A"]
@@ -223,10 +182,12 @@ def check_answer(answer: str):
         answer_C = current_question["Antworten"]["C"]
         erklärung = current_question["Erklärung"]
 
-        logger.info(f"Antwort A: {answer_A}, Antwort B: {answer_B}, Antwort C: {answer_C}, Erklärung: {erklärung}")
+        logger.info(
+            f"Antwort A: {answer_A}, Antwort B: {answer_B}, Antwort C: {answer_C}, Erklärung: {erklärung}")
         return frage, answer_A, answer_B, answer_C, erklärung
 
-def select_next_question(questions: dict) -> dict:    
+
+def select_next_question(questions: dict) -> dict:
     if not questions:
         return {}
     else:
@@ -234,51 +195,52 @@ def select_next_question(questions: dict) -> dict:
         del questions[first_key]
         return questions
 
-def check_answer(selected_answer: str, questions: dict):
+
+def check_answer(selected_answer: str, questions: dict, stats: pd.DataFrame):
     if not questions:
         gr.Info("Alle Fragen beantwortet!")
-    
+
     else:
         first_key = list(questions.keys())[0]
         current_question = questions[first_key]
-        correct_answer = current_question["Korrekte_Antwort"][0]    #Ersten Buchstaben nehmen der Antwort, falls noch mehr dabei steht
+        # Ersten Buchstaben nehmen der Antwort, falls noch mehr dabei steht
+        correct_answer = current_question["Korrekte_Antwort"][0]
         correct_answer_text = current_question["Antworten"][correct_answer]
 
         if selected_answer in correct_answer:
             gr.Info("Richtig!")
+            stats.loc[stats["Bewertung"] == "Korrekt", "Anzahl"] += 1
 
-        else: 
-            gr.Warning(f"Falsch! Die Richtige Antwort wäre {correct_answer}: {correct_answer_text}")
+        else:
+            gr.Warning(
+                f"Falsch! Die Richtige Antwort wäre {correct_answer}: {correct_answer_text}")
+            stats.loc[stats["Bewertung"] == "Falsch", "Anzahl"] += 1
+        logger.info(f"Statistik: {stats}")
+        return select_next_question(questions), update_stat_chart(stats)
+    return questions, stats
 
-        return select_next_question(questions)
 
-<<<<<<< HEAD
-    # Index erst nach Überprüfung erhöhen
-    current_question_index += 1
-    return show_question(current_question_index)
+def update_stat_chart(stats):
+    logger.info(f"Statistik aktualisiert: {stats}")
+    return gr.BarPlot(
+        value=stats,
+        x="Bewertung",
+        y="Anzahl",
+        color="Bewertung",
+        title="Statistik",
+        color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
+    )
 
-def update_stat():
-    global correct_count, wrong_count
-    stats = pd.DataFrame({
-        "Bewertung": ["Korrekt", "Falsch"],
-        "Anzahl": [correct_count, wrong_count]
-    })
-    return stats
-        
-# Launch Gradio Chat Interface
-with gr.Blocks() as demo:
-    collections = get_collections() or []
-    collections_state =gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
 
-    logger.info(f"Collections: {collections}, collection state {collections_state}")
-=======
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
     collections = get_collections() or []
     questions = gr.State({})
+    stats = gr.State(pd.DataFrame(
+        {"Bewertung": ["Korrekt", "Falsch"], "Anzahl": [0, 0]}))
 
-    collections_state = gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
->>>>>>> origin/QA-Frontend
+    # State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
+    collections_state = gr.State(collections)
 
     gr.Markdown("### MaxiKing Chatbot")
     with gr.Tab("Chatbot"):
@@ -286,30 +248,34 @@ with gr.Blocks() as demo:
             with gr.Column(scale=2):
                 chatbot = gr.ChatInterface(
                     fn=chat,
-                    chatbot=gr.Chatbot(height=600),  # Adjusted height for better usability
-                    #textbox=gr.Textbox(placeholder="Ask me questions about your script...", container=False, scale=7),
-                    #title="Chatbot",
-                    #description="Ask me questions about your lecture.",
-                    #theme="soft",
-                    examples=["What is supervised learning?", "What is deep learning?", "What is a linear regression?"],
+                    # Adjusted height for better usability
+                    chatbot=gr.Chatbot(height=600),
+                    # textbox=gr.Textbox(placeholder="Ask me questions about your script...", container=False, scale=7),
+                    # title="Chatbot",
+                    # description="Ask me questions about your lecture.",
+                    # theme="soft",
+                    examples=["What is supervised learning?",
+                              "What is deep learning?", "What is a linear regression?"],
                 )
             with gr.Column():
                 dropdown = gr.Dropdown(label="Collection",
-                                    info="Collection für Kontext auswählen",
-                                    choices=collections,
-                                    value=collections[0] if collections else None,
-                                    interactive=True)
-                upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
-            
-            upload_button.upload(upload_pdf, inputs=upload_button, outputs=[dropdown, collections_state])
+                                       info="Collection für Kontext auswählen",
+                                       choices=collections,
+                                       value=collections[0] if collections else None,
+                                       interactive=True)
+                upload_button = gr.UploadButton("Datei hinzufügen", file_types=[
+                                                ".pdf"], file_count="single")
+
+            upload_button.upload(upload_pdf, inputs=upload_button, outputs=[
+                                 dropdown, collections_state])
             dropdown.change(set_collection, inputs=dropdown)
     with gr.Tab("Quiz"):
-    # Button zum Generieren von Fragen
+        # Button zum Generieren von Fragen
         gen_questions_button = gr.Button("Fragen generieren")
 
     # Spalte für generierte Fragen
         with gr.Column():
-            question_output = gr.Textbox(label="Frage:", interactive=False) 
+            question_output = gr.Textbox(label="Frage:", interactive=False)
 
         # Antworten
             with gr.Row():
@@ -319,55 +285,60 @@ with gr.Blocks() as demo:
 
         # Erklärung ausklappbar
             with gr.Accordion("Erklärung anzeigen", open=False):
-                    explanation_output = gr.Textbox(label="Erklärung:", interactive=False)
+                explanation_output = gr.Textbox(
+                    label="Erklärung:", interactive=False)
 
     # Aktionen zuweisen
         gen_questions_button.click(
-            handle_question_generation2,
-            outputs= questions
+            handle_question_generation,
+            outputs=questions
         )
-        questions.change(show_question, inputs=questions, outputs=[question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output])
 
-        answer_button_A.click(check_answer, inputs=[gr.State("A"), questions], outputs=questions)
-        answer_button_B.click(check_answer, inputs=[gr.State("B"), questions], outputs=questions)
-        answer_button_C.click(check_answer, inputs=[gr.State("C"), questions], outputs=questions)
+        questions.change(show_question, inputs=questions, outputs=[
+                         question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output])
 
     with gr.Tab("Statistik"):
-            with gr.Row():
-                # BarPlot-Komponente zur Darstellung der Statistiken
-                stat_chart = gr.BarPlot(
-                    value=pd.DataFrame({"Bewertung": [], "Anzahl": []}),  # Leerer Startwert
-                    x="Bewertung",
-                    y="Anzahl",
-                    color="Bewertung",
-                    title="Statistik",
-                    color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
-                )
+        with gr.Row():
+            # BarPlot-Komponente zur Darstellung der Statistiken
+            stat_chart = gr.BarPlot(
+                value=stats.value,
+                x="Bewertung",
+                y="Anzahl",
+                color="Bewertung",
+                title="Statistik",
+                color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
+            )
 
-            # Button zum Aktualisieren der Statistik
-            update_stat_button = gr.Button("Statistik aktualisieren")
-            update_stat_button.click(update_stat, outputs=stat_chart)
+        answer_button_A.click(check_answer, inputs=[gr.State(
+            "A"), questions, stats], outputs=[questions, stat_chart])
+        answer_button_B.click(check_answer, inputs=[gr.State(
+            "B"), questions, stats], outputs=[questions, stat_chart])
+        answer_button_C.click(check_answer, inputs=[gr.State(
+            "C"), questions, stats], outputs=[questions, stat_chart])
 
     with gr.Tab("Verwaltung"):
-        #Automatisches generieren der Buttons zum Löschen von Collections
+        # Automatisches generieren der Buttons zum Löschen von Collections
         @gr.render(inputs=collections_state)
         def render_collections(collections):
             for collection in collections:
-                #Für jede Collection einen Button erstellen
+                # Für jede Collection einen Button erstellen
                 with gr.Row():
-                    gr.Textbox(f"Collection {collection}", show_label=False, container=False)
+                    gr.Textbox(f"Collection {collection}",
+                               show_label=False, container=False)
                     delete_btn = gr.Button("Löschen", scale=0, variant="stop")
-                    
-                    def delete(collection = collection):       
-                        #Überprüfung ob Collection ohne Fehler gelöscht wurde, nur dann diese aus der Ansicht entfernen
-                        if delete_collection(str(collection)): 
-                            collections.remove(collection) #Collection aus State löschen damit neu gerendert wird
 
-                        dropdown = update_dropdown()    #Dropdown aktualiseren
+                    def delete(collection=collection):
+                        # Überprüfung ob Collection ohne Fehler gelöscht wurde, nur dann diese aus der Ansicht entfernen
+                        if delete_collection(str(collection)):
+                            # Collection aus State löschen damit neu gerendert wird
+                            collections.remove(collection)
+
+                        dropdown = update_dropdown()  # Dropdown aktualiseren
                         return collections, dropdown
-                         
-                    delete_btn.click(delete, None, [collections_state, dropdown])
-    
+
+                    delete_btn.click(
+                        delete, None, [collections_state, dropdown])
+
     demo.load(update_dropdown, outputs=dropdown)
     demo.load(get_collections, outputs=collections_state)
 demo.launch(debug=True)
