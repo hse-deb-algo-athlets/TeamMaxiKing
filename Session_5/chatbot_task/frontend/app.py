@@ -42,12 +42,11 @@ def upload_pdf(path: str):
     logger.info(response.text)
 
     if response.status_code == 200:
-        gr.Info(response.json()['message'])
+        gr.Info(response.json().get('message', 'Upload erfolgreich'))
         #TODO Geuploadete Collection auswählen im Dropdown
-
         return  update_dropdown()
     else:
-        gr.Warning(response.json()['message'])
+        gr.Warning(response.json().get('message', 'Fehler beim Upload'))
     
 def get_collections():
     """
@@ -58,12 +57,12 @@ def get_collections():
         url = base_url + "get_collections"
         response = requests.get(url)
         response.raise_for_status()
-
         collections = response.json()
         logger.debug(collections)
         return collections
     except Exception as e:
         gr.Warning(f"Fehler beim Collections laden: {e}")
+        return []
 
 def set_collection(selected_collection: str):
     """
@@ -71,14 +70,12 @@ def set_collection(selected_collection: str):
     """
     try:
         url = base_url + "set_collection"
-        
         data = {"collection_name": selected_collection}
-
         response = requests.post(url, json=data)
         response.raise_for_status()
         logger.info(f"Collection {selected_collection} ausgewählt")
-    except:
-        gr.Warning(f"Fehler beim Setzen von {selected_collection}")
+    except Exception as e:
+        gr.Warning(f"Fehler beim Setzen von {selected_collection}: {e} ")
 
 def delete_collection(selected_collection:str):
     try:
@@ -91,8 +88,8 @@ def delete_collection(selected_collection:str):
         logger.info(f"Collection {selected_collection} gelöscht")
         gr.Info(f"Collection {selected_collection} gelöscht")
         return True
-    except:
-        gr.Warning(f"Fehler beim Löschen von {selected_collection}")
+    except Exception as e:
+        gr.Warning(f"Fehler beim Löschen von {selected_collection}: {e}")
         return False
 
 
@@ -165,8 +162,7 @@ async def chat(message: str, history=[]):
             yield bot_message  # Yield updated history incrementally for display
 
     except Exception as e:
-        message = f"Error: {e}"
-        yield message
+        yield f"Fehler: {e}"
 
 def handle_question_generation():
     """Lädt die Fragen und setzt den Index zurück."""
@@ -232,12 +228,10 @@ def check_answer(answer: str):
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
     collections = get_collections() or []
-
     collections_state =gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
 
     logger.info(f"Collections: {collections}, collection state {collections_state}")
 
-    
     gr.Markdown("### MaxiKing Chatbot")
     with gr.Tab("Chatbot"):
         with gr.Row():
@@ -332,7 +326,3 @@ with gr.Blocks() as demo:
     demo.load(update_dropdown, outputs=dropdown)
     demo.load(get_collections, outputs=collections_state)
 demo.launch(debug=True)
-
-
-
-
