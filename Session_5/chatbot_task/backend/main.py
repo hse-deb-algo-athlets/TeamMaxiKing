@@ -11,9 +11,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from src.bot import CustomChatBot
 
-INDEX_DATA = bool(int(os.environ["INDEX_DATA"]))
-#INDEX_DATA = False
-
 # Set up logger
 logger = logging.getLogger("uvicorn")
 logger.setLevel(logging.INFO)
@@ -24,8 +21,7 @@ async def lifespan(app: FastAPI):
     FastAPI lifespan manager to ensure CustomChatBot is initialized and cleaned up correctly.
     """
     logger.info("Creating instance of custom chatbot.")
-    logger.info(f"Index data to vector store: {INDEX_DATA}")
-    app.state.chatbot = CustomChatBot(index_data=INDEX_DATA)
+    app.state.chatbot = CustomChatBot()
     try:
         yield
     finally:
@@ -60,7 +56,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         
         app.state.chatbot.set_vector_db_collection(filename)
 
-        if True:
+        if True: #Kp was ich da noch implementieren wollte... 
             logger.debug("Lade Datei in Vector DB...")
             app.state.chatbot.index_file_to_vector_db(file_path)
         return JSONResponse(content={"message": f"Datei '{filename}' erfolgreich hochgeladen!"})

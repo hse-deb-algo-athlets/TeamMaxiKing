@@ -39,7 +39,12 @@ def upload_pdf(path: str):
     if response.status_code == 200:
         gr.Info(response.json().get('message', 'Upload erfolgreich'))
         #TODO Geuploadete Collection auswählen im Dropdown
+<<<<<<< HEAD
         return  update_dropdown()
+=======
+
+        return  update_dropdown(), get_collections()
+>>>>>>> origin/QA-Frontend
     else:
         gr.Warning(response.json().get('message', 'Fehler beim Upload'))
     
@@ -88,7 +93,7 @@ def delete_collection(selected_collection:str):
         return False
 
 
-def generate_questions():
+def generate_questions() -> dict:
     """
     Generieren von Fragen basierend auf der momentan ausgewählten Collection    
     """
@@ -104,6 +109,7 @@ def generate_questions():
 
     except Exception as e:
         gr.Warning(f"Fehler bei der Generierung von Fragen: {e}")
+        return {}
 
 def update_dropdown(selected_collection=None):
     """
@@ -159,26 +165,15 @@ async def chat(message: str, history=[]):
     except Exception as e:
         yield f"Fehler: {e}"
 
-def handle_question_generation():
-    """Lädt die Fragen und setzt den Index zurück."""
-    global questions, correct_answers, current_question_index
-
-    # Fragen vom Backend abrufen
+def handle_question_generation2():
     data = generate_questions()
-    if not data or not isinstance(data, list):  # Prüfen, ob Daten vorhanden und eine Liste sind
-        gr.Warning("Keine Fragen generiert oder ungültiges Format erhalten.")
-        questions = []  # Leere Liste als Fallback
-        correct_answers = []
-        return ("Keine Frage", "", "", "", "", "")
+    return data
 
-    # Fragen und Antworten initialisieren
-    questions = data
-    correct_answers = [q.get("Korrekte_Antwort", "") for q in questions]  # Verhindert KeyError
-    current_question_index = 0
+def show_question(questions: dict):
 
-    # Erste Frage anzeigen
-    return show_question(0)
+    logger.info(f"Questions: {questions}")
 
+<<<<<<< HEAD
 def show_question(index):
     """Zeigt die Frage und Antworten für den gegebenen Index."""
     if not questions or index >= len(questions):  # Sicherstellen, dass Fragen vorhanden sind
@@ -214,11 +209,50 @@ def check_answer(answer: str):
         gr.Warning(f"Falsch! Die richtige Antwort wäre: {correct}:{frage}")
         wrong_count += 1
 
+=======
+    if not questions:
+        return ("Alle Fragen beantwortet!", " - ", " - ", " - ", " - ", " - ")
+    else:
+        first_key = list(questions.keys())[0]
+        current_question = questions[first_key]
+>>>>>>> origin/QA-Frontend
 
-# Fortschreiten zur nächsten Frage oder Abschluss anzeigen
-    if is_last_question:
-        return ("Alle Fragen beantwortet!", "", "", "", "", "")  # Klarer Abschluss
+        frage = current_question["Frage"]
+        answer_A = current_question["Antworten"]["A"]
+        answer_B = current_question["Antworten"]["B"]
+        answer_C = current_question["Antworten"]["C"]
+        erklärung = current_question["Erklärung"]
 
+        logger.info(f"Antwort A: {answer_A}, Antwort B: {answer_B}, Antwort C: {answer_C}, Erklärung: {erklärung}")
+        return frage, answer_A, answer_B, answer_C, erklärung
+
+def select_next_question(questions: dict) -> dict:    
+    if not questions:
+        return {}
+    else:
+        first_key = list(questions.keys())[0]
+        del questions[first_key]
+        return questions
+
+def check_answer(selected_answer: str, questions: dict):
+    if not questions:
+        gr.Info("Alle Fragen beantwortet!")
+    
+    else:
+        first_key = list(questions.keys())[0]
+        current_question = questions[first_key]
+        correct_answer = current_question["Korrekte_Antwort"][0]    #Ersten Buchstaben nehmen der Antwort, falls noch mehr dabei steht
+        correct_answer_text = current_question["Antworten"][correct_answer]
+
+        if selected_answer in correct_answer:
+            gr.Info("Richtig!")
+
+        else: 
+            gr.Warning(f"Falsch! Die Richtige Antwort wäre {correct_answer}: {correct_answer_text}")
+
+        return select_next_question(questions)
+
+<<<<<<< HEAD
     # Index erst nach Überprüfung erhöhen
     current_question_index += 1
     return show_question(current_question_index)
@@ -237,6 +271,14 @@ with gr.Blocks() as demo:
     collections_state =gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
 
     logger.info(f"Collections: {collections}, collection state {collections_state}")
+=======
+# Launch Gradio Chat Interface
+with gr.Blocks() as demo:
+    collections = get_collections() or []
+    questions = gr.State({})
+
+    collections_state = gr.State(collections) #State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
+>>>>>>> origin/QA-Frontend
 
     gr.Markdown("### MaxiKing Chatbot")
     with gr.Tab("Chatbot"):
@@ -244,7 +286,7 @@ with gr.Blocks() as demo:
             with gr.Column(scale=2):
                 chatbot = gr.ChatInterface(
                     fn=chat,
-                    chatbot=gr.Chatbot(height=400),  # Adjusted height for better usability
+                    chatbot=gr.Chatbot(height=600),  # Adjusted height for better usability
                     #textbox=gr.Textbox(placeholder="Ask me questions about your script...", container=False, scale=7),
                     #title="Chatbot",
                     #description="Ask me questions about your lecture.",
@@ -267,14 +309,13 @@ with gr.Blocks() as demo:
 
     # Spalte für generierte Fragen
         with gr.Column():
-            question_output = gr.Textbox(label="Frage:", interactive=False)
-            
+            question_output = gr.Textbox(label="Frage:", interactive=False) 
 
         # Antworten
             with gr.Row():
-                answer_button_A = gr.Button(value="A)")
-                answer_button_B = gr.Button(value="B)")
-                answer_button_C = gr.Button(value="C)")
+                answer_button_A = gr.Button(value="A")
+                answer_button_B = gr.Button(value="B")
+                answer_button_C = gr.Button(value="C")
 
         # Erklärung ausklappbar
             with gr.Accordion("Erklärung anzeigen", open=False):
@@ -282,21 +323,14 @@ with gr.Blocks() as demo:
 
     # Aktionen zuweisen
         gen_questions_button.click(
-            handle_question_generation,
-            outputs=[question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output]
+            handle_question_generation2,
+            outputs= questions
         )
+        questions.change(show_question, inputs=questions, outputs=[question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output])
 
-        answer_button_A.click(lambda: check_answer("A)"), outputs=[
-            question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
-        ])
-        answer_button_B.click(lambda: check_answer("B)"), outputs=[
-            question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
-        ])
-        answer_button_C.click(lambda: check_answer("C)"), outputs=[
-            question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output
-        ])
-
-       
+        answer_button_A.click(check_answer, inputs=[gr.State("A"), questions], outputs=questions)
+        answer_button_B.click(check_answer, inputs=[gr.State("B"), questions], outputs=questions)
+        answer_button_C.click(check_answer, inputs=[gr.State("C"), questions], outputs=questions)
 
     with gr.Tab("Statistik"):
             with gr.Row():
@@ -316,7 +350,6 @@ with gr.Blocks() as demo:
 
     with gr.Tab("Verwaltung"):
         #Automatisches generieren der Buttons zum Löschen von Collections
-        #TODO: Beim Upload einer neuen Datei State ändern, dass Tab neu gerendert wird
         @gr.render(inputs=collections_state)
         def render_collections(collections):
             for collection in collections:

@@ -34,7 +34,7 @@ class CustomChatBot:
     concise answers using a language model (ChatOllama).
     """
 
-    def __init__(self, index_data: bool) -> None:
+    def __init__(self) -> None:
         """
         Initialize the CustomChatBot class by setting up the ChromaDB client for document retrieval
         and the ChatOllama language model for answer generation.
@@ -48,16 +48,12 @@ class CustomChatBot:
         # Get or create the document collection in ChromaDB
         self.vector_db = self._initialize_vector_db()
 
-        # Process pdf, embedd data and index to ChromaDB
-        if index_data:
-            self._index_data_to_vector_db()
-
         # Initialize the document retriever
         self.retriever = self.vector_db.as_retriever()
 
         # Initialize the large language model (LLM) from Ollama
-        # TODO: ADD HERE YOUR CODE
         self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
+
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
@@ -154,8 +150,6 @@ class CustomChatBot:
         collections = self.client.list_collections()
         collection_names = [collection.name for collection in collections]
         return collection_names
-    
-        
 
     def _clean_document_text(self, chunk):
             # Remove surrogate pairs
@@ -183,26 +177,6 @@ class CustomChatBot:
 
         logger.info(f"File {path} loaded")
 
-
-    def _index_data_to_vector_db(self):
-        pdf_doc = "src/AI_Book.pdf"
-        loader = PyPDFLoader(file_path=pdf_doc)
-
-        pages = loader.load()
-        pages_chunked = RecursiveCharacterTextSplitter(
-            #chunk_size=1024,
-            #chunk_overlap=50
-            ).split_documents(pages)
-        
-        pages_chunked_cleaned = [self._clean_document_text(chunk) for chunk in pages_chunked]
-
-        uuids = [str(uuid4()) for _ in range(len(pages_chunked_cleaned[:50]))]
-        self.vector_db.add_documents(documents=pages_chunked_cleaned[:50], id=uuids)
-        
-        logger.info("AI Book loaded")
-
-
-
     def _qa_generation_chain(self, chunk: str):
         """
         Pipeline um Fragen auf Chunk eines Embeddings zu generieren. Frage muss richtig formatiert werden für die Auswertung
@@ -212,7 +186,7 @@ class CustomChatBot:
         Struktur:
         1. Generiere eine Frage, die den Inhalt des Texts testet.
         2. Gib drei mögliche Antworten (A, B, C), wobei nur eine korrekt ist.
-        3. Gib den Buchstaben der korrekten Antwort aus (zum Beispiel A) )
+        3. Gib nur den Buchstaben der korrekten Antwort aus, z.B. A.
         4. Erklärung: Warum die korrekte Antwort richtig ist (kurz und prägnant).
         
         Befolge das folgende Format exakt wie geschrieben, verwende keine zusätzliche Formatierung. 
@@ -222,7 +196,7 @@ class CustomChatBot:
         A) [Antwort 1]
         B) [Antwort 2]
         C) [Antwort 3]
-        Korrekte Antwort: [hier die korrekte Antwort markieren, z.B. A)]
+        Korrekte Antwort: [hier nur den Buchstaben der korrekten Antwort einfügen]
         Erklärung: [Erklärung hier]
 
         Hier ist der gegebene Text:
@@ -260,31 +234,30 @@ class CustomChatBot:
     def generate_questions(self, collection_name = None):
         
         # Laden der ausgewählten Collection
+        questions = {}
+
         curr_collection_name = collection_name or self.get_current_collection()
         collection = self.client.get_collection(name=curr_collection_name)
-        output_list = []
         docs = collection.get()['documents'] or [] 
-        
         # Durch jedes Embedding in der Collection iterieren und Frage erstellen
         for i, doc in enumerate(docs):
-            logger.info(f"Generiere Frage {i}")
             
+            logger.info(f"Generiere Frage {i}")
             # 3 Versuche für die Generierung einer korrekt formatierten Frage
             for k in range(3):      
                 result = self._qa_generation_chain(doc)
-                logger.info(result)
                 
                 # Parsen der QA Chain Ausgabe in JSON
                 output = self._parse_output(result)
                 
                 if output:
-                    output_list.append(output)
+                    questions.update({i: output})
                     break   # Aus der For-Schleife herausspringen, wenn Frage ausgewertet werden konnte
                 
                 else:
                     print(f"Keine gültige Antwort für Frage {i} erhalten, versuche erneut... ({k})")
-
-        return json.dumps(output_list)
+        logger.info(questions)
+        return questions
 
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
@@ -305,18 +278,13 @@ class CustomChatBot:
         <context>
         {context}
         </context>
-
-
+        Frage:
         {question}"""
 
         rag_prompt = ChatPromptTemplate.from_template(prompt_template)
         retriever = self.vector_db.as_retriever(
-            #search_type="similarity_score_threshold",
             search_kwargs={"k": 5}
-            #search_kwargs={"score_threshold": 0.2}
             )
-
-
 
         qa_rag_chain = (
             {"context": retriever | self._format_docs, "question": RunnablePassthrough()}
@@ -336,9 +304,6 @@ class CustomChatBot:
         Returns:
             str: A string containing the concatenated content of all retrieved documents.
         """
-
-        #for i, doc in enumerate(docs):
-        #    logger.info(f"Dokument {i+1}: {doc.page_content}, Metadaten: {doc.metadata}")
 
         return "\n\n".join(doc.page_content for doc in docs)
 
