@@ -286,6 +286,7 @@ class CustomChatBot:
 
         return json.dumps(output_list)
 
+
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """
         Set up the retrieval-augmented generation (RAG) pipeline for answering questions.

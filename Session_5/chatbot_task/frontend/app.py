@@ -17,14 +17,9 @@ current_selected_collection = ""
 current_question_index = 0
 questions = []
 correct_answers = []
+correct_count = 0
+wrong_count = 0
 
-#Platzhalter
-stats = pd.DataFrame(
-  {
-    "Bewertung": ["Korrekt", "Falsch"],
-    "Anzahl": [80, 47]
-  }
-)
 
 def upload_pdf(path: str):
     if not path:
@@ -202,7 +197,7 @@ def show_question(index):
 
 def check_answer(answer: str):
     """Überprüft die Antwort und zeigt Feedback an."""
-    global current_question_index
+    global current_question_index, correct_count, wrong_count, stats
 
     is_last_question = current_question_index == len(questions) - 1
 
@@ -214,8 +209,11 @@ def check_answer(answer: str):
     # Ergebnis anzeigen
     if is_correct:
         gr.Info("Korrekt!")
+        correct_count += 1
     else:
         gr.Warning(f"Falsch! Die richtige Antwort wäre: {correct}:{frage}")
+        wrong_count += 1
+
 
 # Fortschreiten zur nächsten Frage oder Abschluss anzeigen
     if is_last_question:
@@ -224,6 +222,14 @@ def check_answer(answer: str):
     # Index erst nach Überprüfung erhöhen
     current_question_index += 1
     return show_question(current_question_index)
+
+def update_stat():
+    global correct_count, wrong_count, stats
+    stats = pd.DataFrame({
+        "Bewertung": ["Korrekt", "Falsch"],
+        "Anzahl": [correct_count, wrong_count]
+    })
+    return stats
         
 # Launch Gradio Chat Interface
 with gr.Blocks() as demo:
@@ -302,6 +308,9 @@ with gr.Blocks() as demo:
                 color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
             )
         gr.Button("Statistik laden")
+        update_stat_button = gr.Button("Statistik aktualisieren")
+        update_stat_button.click(update_stat, outputs=st)
+
     with gr.Tab("Verwaltung"):
         #Automatisches generieren der Buttons zum Löschen von Collections
         #TODO: Beim Upload einer neuen Datei State ändern, dass Tab neu gerendert wird
