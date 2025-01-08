@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import re
@@ -33,7 +34,7 @@ class CustomChatBot:
     concise answers using a language model (ChatOllama).
     """
 
-    def __init__(self, index_data: bool) -> None:
+    def __init__(self) -> None:
         """
         Initialize the CustomChatBot class by setting up the ChromaDB client for document retrieval
         and the ChatOllama language model for answer generation.
@@ -47,16 +48,12 @@ class CustomChatBot:
         # Get or create the document collection in ChromaDB
         self.vector_db = self._initialize_vector_db()
 
-        # Process pdf, embedd data and index to ChromaDB
-        if index_data:
-            self._index_data_to_vector_db()
-
         # Initialize the document retriever
-        self.retriever = self.vector_db.as_retriever(k=3)
+        self.retriever = self.vector_db.as_retriever()
 
         # Initialize the large language model (LLM) from Ollama
-        # TODO: ADD HERE YOUR CODE
         self.llm = ChatOllama(model="llama3.2", base_url="http://ollama:11434")
+
         # Set up the retrieval-augmented generation (RAG) pipeline
         self.qa_rag_chain = self._initialize_qa_rag_chain()
 
@@ -98,7 +95,6 @@ class CustomChatBot:
             collection_name=collection_name,
             embedding_function=self.embedding_function
         )
-
         return vector_db_from_client
     
     #Collection Name anpassen falls ungültige Zeichen enthalten sind
@@ -110,12 +106,10 @@ class CustomChatBot:
             adjusted_name = re.sub(r"^[^a-zA-Z0-9]+", "", adjusted_name)
         if adjusted_name and not adjusted_name[-1].isalnum():
             adjusted_name = re.sub(r"[^a-zA-Z0-9]+$", "", adjusted_name)
-        
         if len(adjusted_name) < 3:
             adjusted_name = adjusted_name.ljust(3, "x")
         elif len(adjusted_name) > 63:
             adjusted_name = adjusted_name[:63]
-        
         return adjusted_name
     
     def set_vector_db_collection(self, collection: str):
@@ -138,6 +132,9 @@ class CustomChatBot:
 
     def get_current_collection(self):
         collection = self.vector_db._collection_name
+
+        new_collection = self.get_vector_db_collections()[0] #Andere Collection auswählen, da die aktuelle gelöscht wurde
+        self.set_vector_db_collection(new_collection)
         return collection
 
     def delete_collection(self, collection: str):
@@ -147,15 +144,12 @@ class CustomChatBot:
         except Exception as e:
             logger.info("Collection existiert nicht")
             return f"Collection {collection} konnte nicht gelöscht werden: {e}"
-        
 
 
     def get_vector_db_collections(self): 
         collections = self.client.list_collections()
         collection_names = [collection.name for collection in collections]
         return collection_names
-    
-        
 
     def _clean_document_text(self, chunk):
             # Remove surrogate pairs
@@ -169,8 +163,8 @@ class CustomChatBot:
         loader = PyPDFLoader(file_path=path)
         pages = loader.load()
         pages_chunked = RecursiveCharacterTextSplitter(
-            #chunk_size=2000,
-            #chunk_overlap=200
+            chunk_size=3000,
+            chunk_overlap=300
             ).split_documents(pages)
         pages_chunked_cleaned = [self._clean_document_text(chunk) for chunk in pages_chunked]
 
@@ -183,28 +177,87 @@ class CustomChatBot:
 
         logger.info(f"File {path} loaded")
 
-
-    def _index_data_to_vector_db(self):
-        pdf_doc = "src/AI_Book.pdf"
-
-        # Create pdf data loader
-        # ADD HERE YOUR CODE
-        loader = PyPDFLoader(file_path=pdf_doc)
-
-        # Load and split documents in chunks
-        # ADD HERE YOUR CODE
-        pages = loader.load()
-        pages_chunked = RecursiveCharacterTextSplitter(
-            #chunk_size=1024,
-            #chunk_overlap=50
-            ).split_documents(pages)
+    def _qa_generation_chain(self, chunk: str):
+        """
+        Pipeline um Fragen auf Chunk eines Embeddings zu generieren. Frage muss richtig formatiert werden für die Auswertung
+        """
+        promt_template = """
+        Du bist ein Assistent, der Fragen und Single-Choice-Antworten basierend auf einem gegebenen Text erstellt.
+        Struktur:
+        1. Generiere eine Frage, die den Inhalt des Texts testet.
+        2. Gib drei mögliche Antworten (A, B, C), wobei nur eine korrekt ist.
+        3. Gib nur den Buchstaben der korrekten Antwort aus, z.B. A.
+        4. Erklärung: Warum die korrekte Antwort richtig ist (kurz und prägnant).
         
-        pages_chunked_cleaned = [self._clean_document_text(chunk) for chunk in pages_chunked]
+        Befolge das folgende Format exakt wie geschrieben, verwende keine zusätzliche Formatierung. 
 
-        uuids = [str(uuid4()) for _ in range(len(pages_chunked_cleaned[:50]))]
-        self.vector_db.add_documents(documents=pages_chunked_cleaned[:50], id=uuids)
+        Format:
+        Frage: [Deine generierte Frage]
+        A) [Antwort 1]
+        B) [Antwort 2]
+        C) [Antwort 3]
+        Korrekte Antwort: [hier nur den Buchstaben der korrekten Antwort einfügen]
+        Erklärung: [Erklärung hier]
+
+        Hier ist der gegebene Text:
+        {context}
+        """
+
+        promt = ChatPromptTemplate.from_template(promt_template)
+
+        qa_chain = (
+            {"context" : RunnablePassthrough()}
+            | promt
+            | self.llm
+            | StrOutputParser()
+        )
         
-        logger.info("AI Book loaded")
+        output = qa_chain.invoke({"context": chunk})
+        return output
+    
+    def _parse_output(self, output):
+        logger.info(f"Generierte Frage: {output}")
+        pattern = r"Frage: (.*?)\nA\) (.*?)\nB\) (.*?)\nC\) (.*?)\nKorrekte Antwort: (.*?)\nErklärung: (.*?)$"
+
+        match = re.search(pattern, output, re.DOTALL)
+        if match:
+            return {
+                "Frage": match.group(1),
+                "Antworten": {
+                    "A": match.group(2),
+                    "B": match.group(3),
+                    "C": match.group(4),
+                },
+                "Korrekte_Antwort": match.group(5),
+                "Erklärung": match.group(6),
+            }
+    def generate_questions(self, collection_name = None):
+        
+        # Laden der ausgewählten Collection
+        questions = {}
+
+        curr_collection_name = collection_name or self.get_current_collection()
+        collection = self.client.get_collection(name=curr_collection_name)
+        docs = collection.get()['documents'] or [] 
+        # Durch jedes Embedding in der Collection iterieren und Frage erstellen
+        for i, doc in enumerate(docs):
+            
+            logger.info(f"Generiere Frage {i}")
+            # 3 Versuche für die Generierung einer korrekt formatierten Frage
+            for k in range(3):      
+                result = self._qa_generation_chain(doc)
+                
+                # Parsen der QA Chain Ausgabe in JSON
+                output = self._parse_output(result)
+                
+                if output:
+                    questions.update({i: output})
+                    break   # Aus der For-Schleife herausspringen, wenn Frage ausgewertet werden konnte
+                
+                else:
+                    print(f"Keine gültige Antwort für Frage {i} erhalten, versuche erneut... ({k})")
+        logger.info(questions)
+        return questions
 
 
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
@@ -225,18 +278,13 @@ class CustomChatBot:
         <context>
         {context}
         </context>
-
-
+        Frage:
         {question}"""
 
         rag_prompt = ChatPromptTemplate.from_template(prompt_template)
         retriever = self.vector_db.as_retriever(
-            #search_type="similarity_score_threshold",
             search_kwargs={"k": 5}
-            #search_kwargs={"score_threshold": 0.2}
             )
-
-
 
         qa_rag_chain = (
             {"context": retriever | self._format_docs, "question": RunnablePassthrough()}
@@ -245,6 +293,7 @@ class CustomChatBot:
             | StrOutputParser()
         )
         return qa_rag_chain
+    
     def _format_docs(self, docs: List[Document]) -> str:
         """
         Helper function to format the retrieved documents into a single string.
@@ -255,9 +304,6 @@ class CustomChatBot:
         Returns:
             str: A string containing the concatenated content of all retrieved documents.
         """
-
-        for i, doc in enumerate(docs):
-            logger.info(f"Dokument {i+1}: {doc.page_content}, Metadaten: {doc.metadata}")
 
         return "\n\n".join(doc.page_content for doc in docs)
 

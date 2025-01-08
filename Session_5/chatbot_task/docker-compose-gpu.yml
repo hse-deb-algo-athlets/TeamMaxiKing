@@ -43,7 +43,7 @@ services:
       - app-network
 
   ollama:
-    image: ollama/ollama:0.5.4
+    image: ollama/ollama
     ports:
       - 11434:11434
     volumes:
@@ -52,13 +52,20 @@ services:
     container_name: ollama
     tty: true
     entrypoint: ["/bin/bash", "-c"]
-    command: ["( /bin/ollama serve & sleep 5; /bin/ollama run llama3.2:1b )"]
+    command: ["( /bin/ollama serve & sleep 5; /bin/ollama run llama3.2 )"]
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0
-      - MODEL_NAME=llama3.2:1b
+      - MODEL_NAME=llama3.2
     networks:
       - app-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
 networks:
   app-network:
