@@ -224,7 +224,7 @@ def check_answer(answer: str):
     return show_question(current_question_index)
 
 def update_stat():
-    global correct_count, wrong_count, stats
+    global correct_count, wrong_count
     stats = pd.DataFrame({
         "Bewertung": ["Korrekt", "Falsch"],
         "Anzahl": [correct_count, wrong_count]
@@ -299,17 +299,20 @@ with gr.Blocks() as demo:
        
 
     with gr.Tab("Statistik"):
-        with gr.Row():
-            st = gr.BarPlot(
-                stats,
-                x = "Bewertung",
-                y = "Anzahl",
-                color= "Bewertung",
-                color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
-            )
-        gr.Button("Statistik laden")
-        update_stat_button = gr.Button("Statistik aktualisieren")
-        update_stat_button.click(update_stat, outputs=st)
+            with gr.Row():
+                # BarPlot-Komponente zur Darstellung der Statistiken
+                stat_chart = gr.BarPlot(
+                    value=pd.DataFrame({"Bewertung": [], "Anzahl": []}),  # Leerer Startwert
+                    x="Bewertung",
+                    y="Anzahl",
+                    color="Bewertung",
+                    title="Statistik",
+                    color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
+                )
+
+            # Button zum Aktualisieren der Statistik
+            update_stat_button = gr.Button("Statistik aktualisieren")
+            update_stat_button.click(update_stat, outputs=stat_chart)
 
     with gr.Tab("Verwaltung"):
         #Automatisches generieren der Buttons zum Löschen von Collections
