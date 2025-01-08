@@ -259,6 +259,7 @@ with gr.Blocks() as demo:
                 )
             with gr.Column():
                 dropdown = gr.Dropdown(label="Collection",
+<<<<<<< HEAD
                                        info="Collection für Kontext auswählen",
                                        choices=collections,
                                        value=collections[0] if collections else None,
@@ -268,6 +269,15 @@ with gr.Blocks() as demo:
 
             upload_button.upload(upload_pdf, inputs=upload_button, outputs=[
                                  dropdown, collections_state])
+=======
+                                    info="Collection für Kontext auswählen",
+                                    choices=collections,
+                                    value=collections[0] if collections else None,
+                                    interactive=True)
+                upload_button = gr.UploadButton("Datei hinzufügen", file_types=[".pdf"], file_count="single")
+                
+            upload_button.upload(upload_pdf, inputs=upload_button, outputs=dropdown)
+>>>>>>> origin/Sessions
             dropdown.change(set_collection, inputs=dropdown)
     with gr.Tab("Quiz"):
         # Button zum Generieren von Fragen
