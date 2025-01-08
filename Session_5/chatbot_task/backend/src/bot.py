@@ -95,7 +95,6 @@ class CustomChatBot:
             collection_name=collection_name,
             embedding_function=self.embedding_function
         )
-
         return vector_db_from_client
     
     #Collection Name anpassen falls ungültige Zeichen enthalten sind
@@ -107,12 +106,10 @@ class CustomChatBot:
             adjusted_name = re.sub(r"^[^a-zA-Z0-9]+", "", adjusted_name)
         if adjusted_name and not adjusted_name[-1].isalnum():
             adjusted_name = re.sub(r"[^a-zA-Z0-9]+$", "", adjusted_name)
-        
         if len(adjusted_name) < 3:
             adjusted_name = adjusted_name.ljust(3, "x")
         elif len(adjusted_name) > 63:
             adjusted_name = adjusted_name[:63]
-        
         return adjusted_name
     
     def set_vector_db_collection(self, collection: str):
@@ -262,6 +259,7 @@ class CustomChatBot:
         logger.info(questions)
         return questions
 
+
     def _initialize_qa_rag_chain(self) -> RunnableSerializable:
         """
         Set up the retrieval-augmented generation (RAG) pipeline for answering questions.
@@ -295,6 +293,7 @@ class CustomChatBot:
             | StrOutputParser()
         )
         return qa_rag_chain
+    
     def _format_docs(self, docs: List[Document]) -> str:
         """
         Helper function to format the retrieved documents into a single string.
