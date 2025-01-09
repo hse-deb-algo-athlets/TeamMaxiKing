@@ -203,7 +203,7 @@ def check_answer(selected_answer: str, questions: dict, stats: pd.DataFrame):
 
         if selected_answer in correct_answer:
             gr.Info("Richtig!")
-            stats.loc[stats["Bewertung"] == "Korrekt", "Anzahl"] += 1
+            stats.loc[stats["Bewertung"] == "Richtig", "Anzahl"] += 1
 
         else:
             gr.Warning(
@@ -220,7 +220,7 @@ def update_stat_chart(stats):
         y="Anzahl",
         color="Bewertung",
         title="Statistik",
-        color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
+        color_map={"Richtig": "#75ff33", "Falsch": "#FF5733"}
     )
 
 
@@ -229,7 +229,7 @@ with gr.Blocks() as demo:
     collections = get_collections() or []
     questions = gr.State({})
     stats = gr.State(pd.DataFrame(
-        {"Bewertung": ["Korrekt", "Falsch"], "Anzahl": [0, 0]}))
+        {"Bewertung": ["Richtig", "Falsch"], "Anzahl": [0, 0]}))
 
     # State um Collections zu speichern, bei Änderung wird Verwaltung neu gerendert
     collections_state = gr.State(collections)
@@ -290,15 +290,32 @@ with gr.Blocks() as demo:
                          question_output, answer_button_A, answer_button_B, answer_button_C, explanation_output])
 
     with gr.Tab("Statistik"):
-        with gr.Row():
-            # BarPlot-Komponente zur Darstellung der Statistiken
+        with gr.Row(variant="panel", equal_height= 1):
             stat_chart = gr.BarPlot(
                 value=stats.value,
                 x="Bewertung",
                 y="Anzahl",
                 color="Bewertung",
-                title="Statistik",
-                color_map={"Korrekt": "#75ff33", "Falsch": "#FF5733"}
+                title="Gesamt-Statistik",
+                color_map={"Richtig": "#75ff33", "Falsch": "#FF5733"}
+            )
+        with gr.Row():
+            stat_chart2 = gr.BarPlot(
+                value=stats.value,
+                x="Bewertung",
+                y="Anzahl",
+                color="Bewertung",
+                title="Statistik 1",
+                color_map={"Richtig": "#75ff33", "Falsch": "#FF5733"}
+            )
+        with gr.Row():
+            stat_chart3 = gr.BarPlot(
+                value=stats.value,
+                x="Bewertung",
+                y="Anzahl",
+                color="Bewertung",
+                title="Statistik 2",
+                color_map={"Richtig": "#75ff33", "Falsch": "#FF5733"}
             )
 
         answer_button_A.click(check_answer, inputs=[gr.State(
